@@ -1,0 +1,77 @@
+{
+  "format": 1,
+  "restore": {
+    "/home/user/code/SEpedia/SEpedia.csproj": {}
+  },
+  "projects": {
+    "/home/user/code/SEpedia/SEpedia.csproj": {
+      "version": "1.0.0",
+      "restore": {
+        "projectUniqueName": "/home/user/code/SEpedia/SEpedia.csproj",
+        "projectName": "SEpedia",
+        "projectPath": "/home/user/code/SEpedia/SEpedia.csproj",
+        "packagesPath": "/home/user/.nuget/packages/",
+        "outputPath": "/home/user/code/SEpedia/obj/",
+        "projectStyle": "PackageReference",
+        "configFilePaths": [
+          "/home/user/.nuget/NuGet/NuGet.Config"
+        ],
+        "originalTargetFrameworks": [
+          "netframework48"
+        ],
+        "sources": {
+          "https://api.nuget.org/v3/index.json": {}
+        },
+        "frameworks": {
+          "net48": {
+            "targetAlias": "netframework48",
+            "projectReferences": {}
+          }
+        },
+        "warningProperties": {
+          "warnAsError": [
+            "NU1605"
+          ]
+        },
+        "restoreAuditProperties": {
+          "enableAudit": "true",
+          "auditLevel": "low",
+          "auditMode": "direct"
+        },
+        "SdkAnalysisLevel": "9.0.300"
+      },
+      "frameworks": {
+        "net48": {
+          "targetAlias": "netframework48",
+          "dependencies": {
+            "Mal.Mdk2.ModAnalyzers": {
+              "include": "Runtime, Build, Native, ContentFiles, Analyzers, BuildTransitive",
+              "suppressParent": "All",
+              "target": "Package",
+              "version": "[2.1.16, )"
+            },
+            "Mal.Mdk2.ModPackager": {
+              "include": "Runtime, Build, Native, ContentFiles, Analyzers, BuildTransitive",
+              "suppressParent": "All",
+              "target": "Package",
+              "version": "[2.2.10, )"
+            },
+            "Mal.Mdk2.References": {
+              "include": "Runtime, Build, Native, ContentFiles, Analyzers, BuildTransitive",
+              "suppressParent": "All",
+              "target": "Package",
+              "version": "[2.2.9, )"
+            },
+            "Microsoft.NETFramework.ReferenceAssemblies": {
+              "suppressParent": "All",
+              "target": "Package",
+              "version": "[1.0.3, )",
+              "autoReferenced": true
+            }
+          },
+          "runtimeIdentifierGraphPath": "/home/user/.dotnet/sdk/9.0.317/RuntimeIdentifierGraph.json"
+        }
+      }
+    }
+  }
+}
