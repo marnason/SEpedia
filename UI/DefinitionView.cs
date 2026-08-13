@@ -15,11 +15,15 @@ namespace SEpedia.UI
         private readonly DefinitionIndex index;
         private readonly ScrollBox content;
         private readonly List<HudElementBase> rows;
+        private float lastRowWidth;
+        private bool layoutDirty;
 
         public DefinitionView(DefinitionIndex index, HudParentBase parent = null) : base(parent)
         {
             this.index = index;
             rows = new List<HudElementBase>();
+            lastRowWidth = -1f;
+            layoutDirty = true;
 
             content = new ScrollBox(this)
             {
@@ -37,42 +41,25 @@ namespace SEpedia.UI
         {
             ClearRows();
 
-            AddHeading(definition.DisplayName);
-            AddKeyValue("ID", definition.Id.ToString());
-            AddKeyValue("Type", definition.RuntimeTypeName);
+            AddHeading(definition.DisplayName, definition.Id.ToString(), definition.RuntimeTypeName);
+
+            if (!string.IsNullOrWhiteSpace(definition.Description))
+                AddDescription(definition.Description);
+
             AddKeyValue("Categories", definition.BrowseCategory != BrowseCategory.None
                 ? CatalogIndex.GetCategoryName(definition.BrowseCategory)
                 : (definition.Categories == DefinitionCategory.None ? "Linked definition" : definition.Categories.ToString()));
             AddKeyValue("Origin", definition.Origin.DisplayName);
 
-            if (!definition.Origin.IsVanilla)
-            {
-                if (!string.IsNullOrWhiteSpace(definition.Origin.ModId))
-                    AddKeyValue("Mod ID", definition.Origin.ModId);
-                if (!string.IsNullOrWhiteSpace(definition.Origin.ServiceName))
-                    AddKeyValue("Service", definition.Origin.ServiceName);
-            }
-
-            if (!string.IsNullOrWhiteSpace(definition.Origin.SourceFile))
-                AddKeyValue("Source file", definition.Origin.SourceFile);
-
             AddKeyValue("Flags", "Enabled: " + YesNo(definition.Enabled)
                 + "   Public: " + YesNo(definition.Public)
                 + "   Survival: " + YesNo(definition.AvailableInSurvival));
-
-            if (!string.IsNullOrWhiteSpace(definition.Description))
-            {
-                AddSection("Description");
-                AddParagraph(definition.Description);
-            }
 
             if (definition.PhysicalItem != null)
             {
                 AddSection("Physical item");
                 AddKeyValue("Mass", definition.PhysicalItem.Mass.ToString("0.###"));
                 AddKeyValue("Volume", definition.PhysicalItem.Volume.ToString("0.######"));
-                AddKeyValue("Max stack", definition.PhysicalItem.MaxStackAmount.ToString());
-                AddKeyValue("Integral amounts", YesNo(definition.PhysicalItem.HasIntegralAmounts));
             }
 
             if (definition.Recipe != null)
@@ -114,6 +101,8 @@ namespace SEpedia.UI
         protected override void Layout()
         {
             float rowWidth = Math.Max(120f, UnpaddedSize.X - content.ScrollBar.Width - content.Padding.X - 12f);
+            if (!layoutDirty && Math.Abs(rowWidth - lastRowWidth) < .01f)
+                return;
 
             for (int index = 0; index < rows.Count; index++)
             {
@@ -123,6 +112,9 @@ namespace SEpedia.UI
                 if (label != null)
                     label.LineWrapWidth = Math.Max(80f, rowWidth - label.Padding.X);
             }
+
+            lastRowWidth = rowWidth;
+            layoutDirty = false;
         }
 
         private void AddRecipe(RecipeDocument recipe)
@@ -169,9 +161,7 @@ namespace SEpedia.UI
         private void ShowPlanet(PlanetSnapshot planet)
         {
             ClearRows();
-            AddHeading(planet.DisplayName);
-            AddKeyValue("Entity ID", planet.EntityId.ToString());
-            AddKeyValue("Type", "Spawned planet");
+            AddHeading(planet.DisplayName, planet.EntityId.ToString(), "Spawned planet");
             AddKeyValue("Position", FormatVector(planet.Position));
             AddKeyValue("Minimum radius", FormatDistance(planet.MinimumRadius));
             AddKeyValue("Average radius", FormatDistance(planet.AverageRadius));
@@ -179,28 +169,19 @@ namespace SEpedia.UI
             AddKeyValue("Has atmosphere", YesNo(planet.HasAtmosphere));
             AddKeyValue("Atmosphere radius", FormatDistance(planet.AtmosphereRadius));
             AddKeyValue("Atmosphere altitude", FormatDistance(planet.AtmosphereAltitude));
-            AddKeyValue("Origin", planet.Origin.DisplayName);
-            if (!planet.Origin.IsVanilla)
+            if (planet.Origin.SourceKey != "unknown")
+                AddKeyValue("Origin", planet.Origin.DisplayName);
+            if (planet.HasGeneratorMetadata)
             {
-                if (!string.IsNullOrWhiteSpace(planet.Origin.ModId))
-                    AddKeyValue("Mod ID", planet.Origin.ModId);
-                if (!string.IsNullOrWhiteSpace(planet.Origin.ServiceName))
-                    AddKeyValue("Service", planet.Origin.ServiceName);
-            }
-            AddKeyValue("Inherited flags", planet.HasGeneratorMetadata
-                ? "Enabled: " + YesNo(planet.Enabled)
+                AddKeyValue("Inherited flags", "Enabled: " + YesNo(planet.Enabled)
                     + "   Public: " + YesNo(planet.Public)
-                    + "   Survival: " + YesNo(planet.AvailableInSurvival)
-                : "Unknown (generator definition unavailable)");
+                    + "   Survival: " + YesNo(planet.AvailableInSurvival));
+            }
 
             if (planet.GeneratorId.HasValue)
             {
                 AddSection("Generator");
                 AddDefinitionLink(planet.GeneratorId.Value, string.Empty);
-            }
-            else
-            {
-                AddKeyValue("Generator", "Unknown");
             }
 
             if (planet.GeneratorData != null)
@@ -336,9 +317,34 @@ namespace SEpedia.UI
             AddRow(link);
         }
 
-        private void AddHeading(string text)
+        private void AddHeading(string text, string id, string type)
         {
-            AddLabel(new RichText(text, GlyphFormat.White.WithSize(1.25f)), 36f, new Vector2(8f, 4f));
+            var label = new Label
+            {
+                Text = new RichText(text, GlyphFormat.White.WithSize(1.25f)),
+                Height = 36f,
+                AutoResize = false,
+                VertCenterText = true,
+                Padding = new Vector2(8f, 4f)
+            };
+            new MouseInputElement(label)
+            {
+                ToolTip = "ID: " + (id ?? string.Empty) + "\nType: " + (type ?? string.Empty)
+            };
+            AddRow(label);
+        }
+
+        private void AddDescription(string text)
+        {
+            var label = new Label
+            {
+                Text = new RichText(text ?? string.Empty, GlyphFormat.White.WithAlignment(TextAlignment.Center).WithSize(.82f)),
+                BuilderMode = TextBuilderModes.Wrapped,
+                AutoResize = true,
+                VertCenterText = false,
+                Padding = new Vector2(18f, 4f)
+            };
+            AddRow(label);
         }
 
         private void AddSection(string text)
@@ -389,12 +395,14 @@ namespace SEpedia.UI
         {
             rows.Add(row);
             content.Add(row);
+            layoutDirty = true;
         }
 
         private void ClearRows()
         {
             content.Clear();
             rows.Clear();
+            layoutDirty = true;
         }
 
         private static string YesNo(bool value)

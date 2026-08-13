@@ -26,6 +26,8 @@ MUST and MUST NOT are requirements. SHOULD is the default unless repository evid
 - Alternative HUD or UI frameworks, vanilla notification or chat UI, terminal-control UI, and bespoke billboard interfaces MUST NOT be used as frontend substitutes without explicit user approval.
 - Treat Rich HUD Master as an optional runtime dependency while it is loading or unavailable. Frontend initialization MUST wait for a ready client, fail safely, and avoid breaking backend behavior.
 - Consult the maintained [Rich HUD Framework client documentation](https://zachhembree.github.io/RichHudFramework.Client/index.html) and [official example mod](https://github.com/ZachHembree/TextEditorExample) before implementing its integration. Verify version-sensitive behavior from current primary sources instead of relying on memory or copied third-party snippets.
+- Runtime-sized data MUST NOT create an unbounded number of compound Rich HUD controls. Bound, page, or virtualize dynamic collections; inspect their per-frame layout and measurement work; and validate representative heavily modded counts in game before handoff.
+- Use nested `HudChain` containers for row-and-column layout. A chain-managed axis MUST have one layout owner: a weighted or member-fitted chain child MUST NOT also copy that axis with `DimAlignment`, because parent alignment runs after chain layout and can overwrite the allocated size. Do not compensate for layout conflicts with manual offsets.
 
 ## Working discipline
 
@@ -43,6 +45,7 @@ MUST and MUST NOT are requirements. SHOULD is the default unless repository evid
 - Confirm packaged output when a change affects content layout, packaging, or deployment.
 - Runtime, lifecycle, multiplayer, dedicated-server, or Rich HUD behavior MUST receive a proportionate in-game check when the environment permits it. Report any verification that remains manual or unavailable.
 - For Rich HUD interaction or layering changes, inspect the matching Rich HUD Master implementation as well as the client API, and explicitly test text entry, gameplay-input suppression, vanilla-HUD overlap, and state restoration in game before treating the behavior as verified.
+- For nested Rich HUD layout changes, resize the window through its minimum, default, and representative larger sizes in game and check every row and column for overlap, clipping, and unused space before treating the layout as verified.
 - Before using player-targeted APIs, verify the required identifier and default-argument semantics from primary documentation; do not assume `0` means the local player. Temporary player state changes MUST preserve the previous value, target the local identity explicitly, and restore only state the mod still owns on every close, reset, failure, and unload path.
 
 ## Skills

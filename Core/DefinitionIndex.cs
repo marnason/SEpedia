@@ -15,7 +15,6 @@ namespace SEpedia.Core
 
         public IReadOnlyList<DefinitionDocument> All { get; private set; }
         public RecipeIndex Recipes { get; private set; }
-        public SearchIndex Search { get; private set; }
         public int SourceCount { get; private set; }
         public int SkippedCount { get; private set; }
         public int IssueCount { get; private set; }
@@ -41,7 +40,6 @@ namespace SEpedia.Core
                 blocksUsingItem.Add(pair.Key, pair.Value.AsReadOnly());
 
             Recipes = new RecipeIndex(recipes);
-            Search = new SearchIndex(sorted);
             SourceCount = sourceCount;
             SkippedCount = skippedCount;
             IssueCount = issueCount;

@@ -383,15 +383,4 @@ namespace SEpedia.Core
         }
     }
 
-    public sealed class SearchResult
-    {
-        public IReadOnlyList<DefinitionDocument> Items { get; private set; }
-        public int TotalCount { get; private set; }
-
-        public SearchResult(IList<DefinitionDocument> items, int totalCount)
-        {
-            Items = new List<DefinitionDocument>(items).AsReadOnly();
-            TotalCount = totalCount;
-        }
-    }
 }

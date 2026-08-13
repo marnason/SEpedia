@@ -15,17 +15,18 @@ namespace SEpedia.Core
             public string Blob;
         }
 
-        private sealed class ScoredEntry
+        private struct ScoredEntry
         {
             public CatalogEntry Entry;
             public int Score;
         }
 
-        private readonly List<SearchableEntry> entries;
+        private static readonly IReadOnlyList<SearchableEntry> EmptyEntries = new List<SearchableEntry>().AsReadOnly();
+        private readonly Dictionary<BrowseCategory, List<SearchableEntry>> entriesByCategory;
 
         public CatalogIndex(DefinitionIndex definitions, IEnumerable<PlanetSnapshot> planets)
         {
-            entries = new List<SearchableEntry>();
+            entriesByCategory = new Dictionary<BrowseCategory, List<SearchableEntry>>();
 
             for (int index = 0; index < definitions.All.Count; index++)
             {
@@ -50,24 +51,26 @@ namespace SEpedia.Core
                 throw new ArgumentNullException("filter");
 
             NormalizeCategorySelections(filter);
-
-            List<FacetCount> blockTypes = BuildFacets(filter, true);
-            RemoveUnavailableSelections(filter.SelectedBlockTypes, blockTypes);
-
-            List<FacetCount> sources = BuildFacets(filter, false);
-            RemoveUnavailableSelections(filter.SelectedSourceKeys, sources);
-
-            blockTypes = BuildFacets(filter, true);
-            RemoveUnavailableSelections(filter.SelectedBlockTypes, blockTypes);
-            sources = BuildFacets(filter, false);
-
             string query = Normalize(filter.SearchText).Trim();
             string[] tokens = query.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+            List<SearchableEntry> categoryList;
+            IReadOnlyList<SearchableEntry> categoryEntries = entriesByCategory.TryGetValue(filter.Category, out categoryList)
+                ? categoryList
+                : EmptyEntries;
+            List<FacetCount> sources;
+            List<FacetCount> blockTypes;
+            BuildFacets(categoryEntries, filter, query, tokens, out sources, out blockTypes);
+
+            bool selectionsChanged = RemoveUnavailableSelections(filter.SelectedSourceKeys, sources);
+            selectionsChanged |= RemoveUnavailableSelections(filter.SelectedBlockTypes, blockTypes);
+            if (selectionsChanged)
+                BuildFacets(categoryEntries, filter, query, tokens, out sources, out blockTypes);
+
             var matches = new List<ScoredEntry>();
 
-            for (int index = 0; index < entries.Count; index++)
+            for (int index = 0; index < categoryEntries.Count; index++)
             {
-                SearchableEntry searchable = entries[index];
+                SearchableEntry searchable = categoryEntries[index];
                 if (!MatchesFilters(searchable.Entry, filter, false, false))
                     continue;
 
@@ -136,7 +139,7 @@ namespace SEpedia.Core
             string name = Normalize(entry.DisplayName);
             string normalizedSubtype = Normalize(subtype);
 
-            entries.Add(new SearchableEntry
+            var searchable = new SearchableEntry
             {
                 Entry = entry,
                 Name = name,
@@ -152,52 +155,83 @@ namespace SEpedia.Core
                     Normalize(entry.Origin.ModId),
                     Normalize(entry.Origin.ServiceName)
                 })
-            });
+            };
+
+            List<SearchableEntry> categoryEntries;
+            if (!entriesByCategory.TryGetValue(entry.Category, out categoryEntries))
+            {
+                categoryEntries = new List<SearchableEntry>();
+                entriesByCategory.Add(entry.Category, categoryEntries);
+            }
+            categoryEntries.Add(searchable);
         }
 
-        private List<FacetCount> BuildFacets(CatalogFilter filter, bool blockTypeFacet)
+        private void BuildFacets(
+            IReadOnlyList<SearchableEntry> categoryEntries,
+            CatalogFilter filter,
+            string query,
+            string[] tokens,
+            out List<FacetCount> sources,
+            out List<FacetCount> blockTypes)
         {
-            var counts = new Dictionary<string, int>(StringComparer.Ordinal);
-            var displayNames = new Dictionary<string, string>(StringComparer.Ordinal);
-            string query = Normalize(filter.SearchText).Trim();
-            string[] tokens = query.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+            var sourceCounts = new Dictionary<string, int>(StringComparer.Ordinal);
+            var sourceNames = new Dictionary<string, string>(StringComparer.Ordinal);
+            var blockTypeCounts = new Dictionary<string, int>(StringComparer.Ordinal);
+            var blockTypeNames = new Dictionary<string, string>(StringComparer.Ordinal);
 
-            for (int index = 0; index < entries.Count; index++)
+            for (int index = 0; index < categoryEntries.Count; index++)
             {
-                SearchableEntry searchable = entries[index];
-                if (!MatchesFilters(searchable.Entry, filter, !blockTypeFacet, blockTypeFacet) ||
+                SearchableEntry searchable = categoryEntries[index];
+                CatalogEntry entry = searchable.Entry;
+                if (!MatchesTriState(entry.Enabled, filter.Enabled) ||
+                    !MatchesTriState(entry.Public, filter.Public) ||
+                    !MatchesTriState(entry.AvailableInSurvival, filter.AvailableInSurvival) ||
                     Score(searchable, query, tokens) < 0)
                     continue;
 
-                string key;
-                string display;
-                if (blockTypeFacet)
+                if (MatchesFilters(entry, filter, true, false))
                 {
-                    if (searchable.Entry.Definition == null || searchable.Entry.Definition.CubeBlock == null)
-                        continue;
-                    key = searchable.Entry.Definition.RuntimeTypeName;
-                    display = GetFriendlyRuntimeType(key);
-                }
-                else
-                {
-                    key = searchable.Entry.Origin.SourceKey;
-                    display = searchable.Entry.Origin.DisplayName;
+                    string sourceKey = entry.Origin.SourceKey;
+                    AddFacet(sourceCounts, sourceNames, sourceKey, entry.Origin.DisplayName);
                 }
 
-                int count;
-                counts.TryGetValue(key, out count);
-                counts[key] = count + 1;
-                displayNames[key] = display;
+                if (filter.Category == BrowseCategory.Blocks &&
+                    MatchesFilters(entry, filter, false, true))
+                {
+                    DefinitionDocument definition = entry.Definition;
+                    if (definition != null && definition.CubeBlock != null)
+                    {
+                        string blockTypeKey = definition.RuntimeTypeName;
+                        AddFacet(blockTypeCounts, blockTypeNames, blockTypeKey, GetFriendlyRuntimeType(blockTypeKey));
+                    }
+                }
             }
 
-            var result = new List<FacetCount>();
+            sources = CreateFacets(sourceCounts, sourceNames);
+            sources.Sort(CompareSourceFacet);
+            blockTypes = CreateFacets(blockTypeCounts, blockTypeNames);
+            blockTypes.Sort(CompareFacet);
+        }
+
+        private static void AddFacet(
+            IDictionary<string, int> counts,
+            IDictionary<string, string> displayNames,
+            string key,
+            string displayName)
+        {
+            int count;
+            counts.TryGetValue(key, out count);
+            counts[key] = count + 1;
+            displayNames[key] = displayName;
+        }
+
+        private static List<FacetCount> CreateFacets(
+            IDictionary<string, int> counts,
+            IDictionary<string, string> displayNames)
+        {
+            var result = new List<FacetCount>(counts.Count);
             foreach (KeyValuePair<string, int> pair in counts)
                 result.Add(new FacetCount(pair.Key, displayNames[pair.Key], pair.Value));
-
-            if (blockTypeFacet)
-                result.Sort(CompareFacet);
-            else
-                result.Sort(CompareSourceFacet);
             return result;
         }
 
@@ -280,15 +314,17 @@ namespace SEpedia.Core
             }
         }
 
-        private static void RemoveUnavailableSelections(HashSet<string> selected, IList<FacetCount> available)
+        private static bool RemoveUnavailableSelections(HashSet<string> selected, IList<FacetCount> available)
         {
             if (selected.Count == 0)
-                return;
+                return false;
 
             var keys = new HashSet<string>(StringComparer.Ordinal);
             for (int index = 0; index < available.Count; index++)
                 keys.Add(available[index].Key);
+            int originalCount = selected.Count;
             selected.RemoveWhere(delegate(string key) { return !keys.Contains(key); });
+            return selected.Count != originalCount;
         }
 
         private static int CompareScored(ScoredEntry left, ScoredEntry right)

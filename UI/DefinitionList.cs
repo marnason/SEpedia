@@ -9,13 +9,26 @@ namespace SEpedia.UI
 {
     public sealed class DefinitionList : HudElementBase
     {
+        private sealed class CategoryButton
+        {
+            public readonly BrowseCategory Category;
+            public readonly LabelBoxButton Button;
+
+            public CategoryButton(BrowseCategory category, LabelBoxButton button)
+            {
+                Category = category;
+                Button = button;
+            }
+        }
+
         public event Action<CatalogEntry> SelectionChanged;
         public event Action FilterRequested;
         public event Action ResultsChanged;
 
         private readonly DefinitionIndex definitions;
         private readonly CatalogFilter filter;
-        private readonly ListBox<BrowseCategory> categories;
+        private readonly List<CategoryButton> categoryButtons;
+        private readonly HudChain categoryPanel;
         private readonly ListBox<CatalogEntry> list;
         private readonly Label status;
         private CatalogIndex catalog;
@@ -42,6 +55,11 @@ namespace SEpedia.UI
             get { return currentResults; }
         }
 
+        public HudElementBase CategoryBar
+        {
+            get { return categoryPanel; }
+        }
+
         public DefinitionList(
             DefinitionIndex definitions,
             CatalogFilter filter,
@@ -51,41 +69,24 @@ namespace SEpedia.UI
             this.definitions = definitions;
             this.filter = filter;
             catalog = new CatalogIndex(definitions, planets);
+            categoryButtons = new List<CategoryButton>();
 
-            categories = new ListBox<BrowseCategory>
+            categoryPanel = new HudChain(false)
             {
-                Height = 236f,
-                DimAlignment = DimAlignments.Width,
-                Format = GlyphFormat.White.WithSize(.78f),
-                LineHeight = 22f,
-                MemberPadding = new Vector2(10f, 2f),
-                UpdateValueCallback = OnCategoryChanged
+                SizingMode = HudChainSizingModes.FitChainOffAxis,
+                Spacing = 2f
             };
-
-            updating = true;
-
-            BrowseCategory[] orderedCategories =
-            {
-                BrowseCategory.Components,
-                BrowseCategory.Ores,
-                BrowseCategory.Ingots,
-                BrowseCategory.Ammo,
-                BrowseCategory.ToolsAndWeapons,
-                BrowseCategory.Consumables,
-                BrowseCategory.GasBottles,
-                BrowseCategory.Items,
-                BrowseCategory.Blocks,
-                BrowseCategory.Celestial
-            };
-
-            for (int index = 0; index < orderedCategories.Length; index++)
-            {
-                BrowseCategory category = orderedCategories[index];
-                categories.Add(new RichText(CatalogIndex.GetCategoryName(category), GlyphFormat.White.WithSize(.78f)), category);
-                if (category == filter.Category)
-                    categories.SetSelectionAt(index);
-            }
-            updating = false;
+            AddCategoryButton(BrowseCategory.Components, 1.25f);
+            AddCategoryButton(BrowseCategory.Ores, .65f);
+            AddCategoryButton(BrowseCategory.Ingots, .75f);
+            AddCategoryButton(BrowseCategory.Ammo, .7f);
+            AddCategoryButton(BrowseCategory.ToolsAndWeapons, 1.65f);
+            AddCategoryButton(BrowseCategory.Consumables, 1.3f);
+            AddCategoryButton(BrowseCategory.GasBottles, 1.15f);
+            AddCategoryButton(BrowseCategory.Items, .65f);
+            AddCategoryButton(BrowseCategory.Blocks, .75f);
+            AddCategoryButton(BrowseCategory.Celestial, .95f);
+            UpdateCategoryButtons();
 
             var filterButton = new LabelBoxButton
             {
@@ -109,7 +110,7 @@ namespace SEpedia.UI
                 DimAlignment = DimAlignments.Width,
                 Format = GlyphFormat.White.WithSize(.85f),
                 LineHeight = 27f,
-                MemberPadding = new Vector2(12f, 4f),
+                MemberPadding = new Vector2(24f, 4f),
                 UpdateValueCallback = OnSelectionChanged
             };
 
@@ -127,7 +128,7 @@ namespace SEpedia.UI
                 DimAlignment = DimAlignments.UnpaddedSize,
                 SizingMode = HudChainSizingModes.FitMembersOffAxis,
                 Spacing = 2f,
-                CollectionContainer = { categories, filterButton, { list, 1f }, status }
+                CollectionContainer = { filterButton, { list, 1f }, status }
             };
 
             Refresh();
@@ -206,13 +207,53 @@ namespace SEpedia.UI
             return false;
         }
 
-        private void OnCategoryChanged(object sender, EventArgs args)
+        private void AddCategoryButton(BrowseCategory category, float widthWeight)
         {
-            if (updating || categories.Value == null)
-                return;
+            LabelBoxButton button = CreateCategoryButton(category);
+            categoryButtons.Add(new CategoryButton(category, button));
+            categoryPanel.Add(button, widthWeight);
+        }
 
-            filter.Category = categories.Value.AssocMember;
-            Refresh();
+        private LabelBoxButton CreateCategoryButton(BrowseCategory category)
+        {
+            var button = new LabelBoxButton
+            {
+                Text = new RichText(
+                    CatalogIndex.GetCategoryName(category),
+                    GlyphFormat.White.WithAlignment(TextAlignment.Center).WithSize(.68f)),
+                Height = 29f,
+                AutoResize = false,
+                VertCenterText = true,
+                TextPadding = new Vector2(4f, 0f),
+                Color = new Color(36, 47, 55),
+                HighlightColor = new Color(67, 82, 92)
+            };
+            button.MouseInput.LeftClicked += delegate
+            {
+                if (filter.Category == category)
+                    return;
+
+                filter.Category = category;
+                UpdateCategoryButtons();
+                Refresh();
+            };
+            return button;
+        }
+
+        private void UpdateCategoryButtons()
+        {
+            for (int index = 0; index < categoryButtons.Count; index++)
+            {
+                CategoryButton categoryButton = categoryButtons[index];
+                bool selected = categoryButton.Category == filter.Category;
+                categoryButton.Button.Color = selected
+                    ? new Color(142, 188, 206)
+                    : new Color(36, 47, 55);
+                categoryButton.Button.Format = selected
+                    ? GlyphFormat.White.WithColor(new Color(39, 49, 55)).WithAlignment(TextAlignment.Center).WithSize(.68f)
+                    : GlyphFormat.White.WithAlignment(TextAlignment.Center).WithSize(.68f);
+                categoryButton.Button.HighlightEnabled = !selected;
+            }
         }
 
         private void OnSelectionChanged(object sender, EventArgs args)

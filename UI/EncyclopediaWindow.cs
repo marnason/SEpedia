@@ -55,12 +55,19 @@ namespace SEpedia.UI
             definitionView = new DefinitionView(index);
             vanillaHud = new VanillaHudVisibilityController();
 
-            new HudChain(false, body)
+            var content = new HudChain(false)
+            {
+                SizingMode = HudChainSizingModes.FitMembersOffAxis,
+                Spacing = 2f,
+                CollectionContainer = { definitionList, filterDrawer, { definitionView, 1f } }
+            };
+
+            new HudChain(true, body)
             {
                 DimAlignment = DimAlignments.UnpaddedSize,
                 SizingMode = HudChainSizingModes.FitMembersOffAxis,
                 Spacing = 2f,
-                CollectionContainer = { definitionList, filterDrawer, { definitionView, 1f } }
+                CollectionContainer = { definitionList.CategoryBar, { content, 1f } }
             };
 
             navigation = new NavigationController(index, definitionList, definitionView);
@@ -68,7 +75,6 @@ namespace SEpedia.UI
             definitionList.ResultsChanged += RefreshFilterDrawer;
             filterDrawer.FiltersChanged += FiltersChanged;
             filterDrawer.ResetRequested += ResetFilters;
-            RefreshFilterDrawer();
 
             BodyColor = new Color(31, 40, 47, 245);
             BorderColor = new Color(58, 68, 77);
@@ -109,7 +115,6 @@ namespace SEpedia.UI
         public void RefreshCelestial()
         {
             definitionList.RebuildCatalog(celestial != null ? celestial.Planets : null);
-            RefreshFilterDrawer();
         }
 
         public void Close()
@@ -126,9 +131,9 @@ namespace SEpedia.UI
         protected override void Layout()
         {
             base.Layout();
-            searchField.Width = Math.Min(360f, Math.Max(220f, Width * .32f));
-            definitionList.Width = Math.Min(350f, Math.Max(275f, body.Width * .28f));
-            filterDrawer.Width = Math.Min(320f, Math.Max(250f, body.Width * .25f));
+            SetWidthIfChanged(searchField, Math.Min(360f, Math.Max(220f, Width * .32f)));
+            SetWidthIfChanged(definitionList, Math.Min(350f, Math.Max(275f, body.Width * .28f)));
+            SetWidthIfChanged(filterDrawer, Math.Min(320f, Math.Max(250f, body.Width * .25f)));
         }
 
         private void SearchChanged(object sender, EventArgs args)
@@ -156,8 +161,14 @@ namespace SEpedia.UI
 
         private void RefreshFilterDrawer()
         {
-            if (definitionList.CurrentResults != null)
+            if (filterDrawer.Visible && definitionList.CurrentResults != null)
                 filterDrawer.Refresh(definitionList.CurrentResults);
+        }
+
+        private static void SetWidthIfChanged(HudElementBase element, float width)
+        {
+            if (Math.Abs(element.Width - width) >= .01f)
+                element.Width = width;
         }
     }
 }
