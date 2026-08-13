@@ -1,0 +1,91 @@
+# Build output
+[Bb]in/
+[Oo]bj/
+[Aa]rtifacts/
+.artifacts/
+[Oo]ut/
+[Dd]ebug/
+[Rr]elease/
+
+# Visual Studio user state and caches
+.vs/
+*.rsuser
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.userprefs
+mono_crash.*
+
+# Visual Studio Code local state; keep portable project configuration
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+!.vscode/*.code-snippets
+/SEpedia.code-workspace
+.history/
+.vshistory/
+
+# JetBrains IDE user state
+.idea/
+*.sln.iml
+*.DotSettings.user
+
+# Test, coverage, and build logs
+[Tt]est[Rr]esult*/
+BenchmarkDotNet.Artifacts/
+OpenCover/
+*.trx
+*.VisualState.xml
+TestResult.xml
+nunit-*.xml
+*.received.*
+*.coverage
+*.coveragexml
+coverage*.json
+coverage*.xml
+coverage*.info
+*.binlog
+[Bb]uild[Ll]og.*
+[Ll]og/
+[Ll]ogs/
+*.log
+
+# NuGet restore and package output
+[Pp]ackages/
+*.nupkg
+*.snupkg
+*.nuget.props
+*.nuget.targets
+
+# Local environment and credentials
+.env
+.env.*
+!.env.example
+*.pfx
+*.publishsettings
+
+# Editor, merge, and operating-system debris
+*.tmp
+*.temp
+*.orig
+*.rej
+*~
+~$*
+.DS_Store
+Thumbs.db
+
+# MDK² and Space Engineers machine-local/generated metadata
+mdk.local.ini
+*.mdk.local.ini
+[Mm][Dd][Kk]/
+mdk.meta
+metadata.mod
+modinfo.sbmi
+
+# MDK² scaffold instruction placeholders
+/Place your code files here
+/Content/Data/SBC files can go here
+/Content/Other content folders

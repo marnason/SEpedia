@@ -38,6 +38,7 @@ MUST and MUST NOT are requirements. SHOULD is the default unless repository evid
 ## Verification
 
 - Run the cheapest checks that meaningfully cover the change, beginning with `dotnet build SEpedia.sln` for code or project changes.
+- Before running or handing off an MDK² build, confirm that generated output and machine-local configuration are ignored and untracked while preserving required local copies. This includes `mdk.local.ini` and `<project>.mdk.local.ini`. Use `-p:MdkBuildConfiguration=CompileOnly` for compile-only iteration and `-p:MdkInteractive=no` for headless packaging. If a GUI action is unavoidable, tell the user exactly what will open and what they need to do before invoking it.
 - Treat MDK analyzer and packager diagnostics as part of the build result; do not report success while relevant warnings or errors remain unexplained.
 - Confirm packaged output when a change affects content layout, packaging, or deployment.
 - Runtime, lifecycle, multiplayer, dedicated-server, or Rich HUD behavior MUST receive a proportionate in-game check when the environment permits it. Report any verification that remains manual or unavailable.
