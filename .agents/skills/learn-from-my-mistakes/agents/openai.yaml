@@ -1,0 +1,7 @@
+interface:
+  display_name: "Learn from My Mistakes"
+  short_description: "Turn preventable mistakes into durable guidance"
+  default_prompt: "Use $learn-from-my-mistakes to turn this preventable mistake into durable workspace guidance."
+
+policy:
+  allow_implicit_invocation: true
