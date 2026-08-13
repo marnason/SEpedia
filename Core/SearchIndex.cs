@@ -54,6 +54,11 @@ namespace SEpedia.Core
 
         public SearchResult Search(string query, int limit)
         {
+            return Search(query, limit, DefinitionCategory.None);
+        }
+
+        public SearchResult Search(string query, int limit, DefinitionCategory requiredCategory)
+        {
             string normalizedQuery = Normalize(query).Trim();
             string[] tokens = normalizedQuery.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
             var matches = new List<ScoredDefinition>();
@@ -61,6 +66,11 @@ namespace SEpedia.Core
             for (int index = 0; index < entries.Count; index++)
             {
                 SearchableDefinition entry = entries[index];
+
+                if (requiredCategory != DefinitionCategory.None &&
+                    (entry.Document.Categories & requiredCategory) == 0)
+                    continue;
+
                 int score = Score(entry, normalizedQuery, tokens);
 
                 if (score >= 0)

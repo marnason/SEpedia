@@ -18,6 +18,7 @@ namespace SEpedia
         private const int BindingPollTicks = 120;
 
         private DefinitionIndex definitionIndex;
+        private CelestialIndex celestialIndex;
         private SEpediaFrontend frontend;
         private int tick;
         private int nextBuildAttempt;
@@ -31,6 +32,7 @@ namespace SEpedia
             tick = 0;
             nextBuildAttempt = 0;
             definitionIndex = null;
+            celestialIndex = null;
             unloading = false;
             uiWarningLogged = false;
 
@@ -83,6 +85,13 @@ namespace SEpedia
                 frontend = null;
             }
 
+            if (celestialIndex != null)
+            {
+                celestialIndex.Changed -= OnCelestialChanged;
+                celestialIndex.Close();
+                celestialIndex = null;
+            }
+
             definitionIndex = null;
             SEpediaLog.Info("Session unloaded.");
             base.UnloadData();
@@ -97,9 +106,30 @@ namespace SEpedia
             var stopwatch = Stopwatch.StartNew();
             try
             {
-                DefinitionIndex built = DefinitionIndex.Build(manager.GetAllDefinitions(), SEpediaLog.Warning);
+                bool survivalMode = MyAPIGateway.Session != null && !MyAPIGateway.Session.CreativeMode;
+                DefinitionIndex built = DefinitionIndex.Build(manager, survivalMode, SEpediaLog.Warning);
                 stopwatch.Stop();
                 definitionIndex = built;
+
+                if (!MyAPIGateway.Utilities.IsDedicated)
+                {
+                    try
+                    {
+                        celestialIndex = new CelestialIndex(built, SEpediaLog.Warning);
+                        celestialIndex.Changed += OnCelestialChanged;
+                        celestialIndex.Initialize();
+                    }
+                    catch (Exception exception)
+                    {
+                        if (celestialIndex != null)
+                        {
+                            celestialIndex.Changed -= OnCelestialChanged;
+                            celestialIndex.Close();
+                            celestialIndex = null;
+                        }
+                        SEpediaLog.Error("Celestial entity tracking could not be initialized; definition browsing remains available.", exception);
+                    }
+                }
 
                 SEpediaLog.Info(
                     "Indexed " + built.All.Count + " of " + built.SourceCount + " definitions, " +
@@ -107,7 +137,7 @@ namespace SEpedia
                     stopwatch.ElapsedMilliseconds + " ms.");
 
                 if (frontend != null)
-                    frontend.AttachIndex(built);
+                    frontend.AttachIndex(built, celestialIndex, survivalMode);
             }
             catch (Exception exception)
             {
@@ -126,7 +156,16 @@ namespace SEpedia
 
             frontend.InitializeRichHud();
             if (definitionIndex != null)
-                frontend.AttachIndex(definitionIndex);
+                frontend.AttachIndex(
+                    definitionIndex,
+                    celestialIndex,
+                    MyAPIGateway.Session != null && !MyAPIGateway.Session.CreativeMode);
+        }
+
+        private void OnCelestialChanged()
+        {
+            if (frontend != null)
+                frontend.RefreshCelestial();
         }
 
         private void OnRichHudReset()

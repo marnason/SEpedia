@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using RichHudFramework.UI;
 using RichHudFramework.UI.Rendering;
 using SEpedia.Core;
@@ -8,14 +9,20 @@ namespace SEpedia.UI
 {
     public sealed class DefinitionList : HudElementBase
     {
-        public event Action<DefinitionDocument> SelectionChanged;
+        public event Action<CatalogEntry> SelectionChanged;
+        public event Action FilterRequested;
+        public event Action ResultsChanged;
 
-        private readonly DefinitionIndex index;
-        private readonly ListBox<DefinitionDocument> list;
+        private readonly DefinitionIndex definitions;
+        private readonly CatalogFilter filter;
+        private readonly ListBox<BrowseCategory> categories;
+        private readonly ListBox<CatalogEntry> list;
         private readonly Label status;
-        private SearchResult currentResults;
+        private CatalogIndex catalog;
+        private CatalogResult currentResults;
+        private bool updating;
 
-        public DefinitionDocument First
+        public CatalogEntry First
         {
             get
             {
@@ -25,20 +32,79 @@ namespace SEpedia.UI
             }
         }
 
-        public DefinitionList(DefinitionIndex index, HudParentBase parent = null) : base(parent)
+        public CatalogFilter Filter
         {
-            this.index = index;
+            get { return filter; }
+        }
 
-            var title = new Label
+        public CatalogResult CurrentResults
+        {
+            get { return currentResults; }
+        }
+
+        public DefinitionList(
+            DefinitionIndex definitions,
+            CatalogFilter filter,
+            IEnumerable<PlanetSnapshot> planets,
+            HudParentBase parent = null) : base(parent)
+        {
+            this.definitions = definitions;
+            this.filter = filter;
+            catalog = new CatalogIndex(definitions, planets);
+
+            categories = new ListBox<BrowseCategory>
             {
-                Text = new RichText("Definitions", GlyphFormat.White.WithSize(1.05f)),
-                Height = 28f,
-                AutoResize = false,
-                VertCenterText = true,
-                Padding = new Vector2(8f, 0f)
+                Height = 236f,
+                DimAlignment = DimAlignments.Width,
+                Format = GlyphFormat.White.WithSize(.78f),
+                LineHeight = 22f,
+                MemberPadding = new Vector2(10f, 2f),
+                UpdateValueCallback = OnCategoryChanged
             };
 
-            list = new ListBox<DefinitionDocument>
+            updating = true;
+
+            BrowseCategory[] orderedCategories =
+            {
+                BrowseCategory.Components,
+                BrowseCategory.Ores,
+                BrowseCategory.Ingots,
+                BrowseCategory.Ammo,
+                BrowseCategory.ToolsAndWeapons,
+                BrowseCategory.Consumables,
+                BrowseCategory.GasBottles,
+                BrowseCategory.Items,
+                BrowseCategory.Blocks,
+                BrowseCategory.Celestial
+            };
+
+            for (int index = 0; index < orderedCategories.Length; index++)
+            {
+                BrowseCategory category = orderedCategories[index];
+                categories.Add(new RichText(CatalogIndex.GetCategoryName(category), GlyphFormat.White.WithSize(.78f)), category);
+                if (category == filter.Category)
+                    categories.SetSelectionAt(index);
+            }
+            updating = false;
+
+            var filterButton = new LabelBoxButton
+            {
+                Text = new RichText("Advanced filters", GlyphFormat.White.WithSize(.8f)),
+                Height = 29f,
+                AutoResize = false,
+                VertCenterText = true,
+                TextPadding = Vector2.Zero,
+                Color = new Color(36, 47, 55),
+                HighlightColor = new Color(67, 82, 92)
+            };
+            filterButton.MouseInput.LeftClicked += delegate
+            {
+                Action handler = FilterRequested;
+                if (handler != null)
+                    handler();
+            };
+
+            list = new ListBox<CatalogEntry>
             {
                 DimAlignment = DimAlignments.Width,
                 Format = GlyphFormat.White.WithSize(.85f),
@@ -52,7 +118,7 @@ namespace SEpedia.UI
                 Height = 24f,
                 AutoResize = false,
                 VertCenterText = true,
-                Format = GlyphFormat.Blueish.WithSize(.75f),
+                Format = GlyphFormat.Blueish.WithSize(.72f),
                 Padding = new Vector2(8f, 0f)
             };
 
@@ -60,29 +126,67 @@ namespace SEpedia.UI
             {
                 DimAlignment = DimAlignments.UnpaddedSize,
                 SizingMode = HudChainSizingModes.FitMembersOffAxis,
-                CollectionContainer = { title, { list, 1f }, status }
+                Spacing = 2f,
+                CollectionContainer = { categories, filterButton, { list, 1f }, status }
             };
 
-            Refresh(string.Empty);
+            Refresh();
         }
 
-        public void Refresh(string query)
+        public void SetSearchText(string query)
         {
-            currentResults = index.Search.Search(query, 500);
-            list.ClearEntries();
+            filter.SearchText = query ?? string.Empty;
+            Refresh();
+        }
 
-            for (int itemIndex = 0; itemIndex < currentResults.Items.Count; itemIndex++)
+        public void Refresh()
+        {
+            string previousKey = list.Value != null && list.Value.AssocMember != null
+                ? list.Value.AssocMember.StableKey
+                : string.Empty;
+
+            currentResults = catalog.Query(filter, 500);
+            updating = true;
+            try
             {
-                DefinitionDocument definition = currentResults.Items[itemIndex];
-                var text = new RichText();
-                text.Add(definition.DisplayName, GlyphFormat.White.WithSize(.85f));
-                text.Add("  " + GetCategoryLabel(definition), GlyphFormat.Blueish.WithSize(.68f));
-                list.Add(text, definition);
+                list.ClearEntries();
+                int selectedIndex = -1;
+                for (int itemIndex = 0; itemIndex < currentResults.Items.Count; itemIndex++)
+                {
+                    CatalogEntry entry = currentResults.Items[itemIndex];
+                    var text = new RichText();
+                    text.Add(entry.DisplayName, GlyphFormat.White.WithSize(.83f));
+                    text.Add("  " + GetEntryLabel(entry), GlyphFormat.Blueish.WithSize(.65f));
+                    list.Add(text, entry);
+                    if (entry.StableKey == previousKey)
+                        selectedIndex = itemIndex;
+                }
+
+                if (currentResults.Items.Count > 0)
+                    list.SetSelectionAt(selectedIndex >= 0 ? selectedIndex : 0);
+            }
+            finally
+            {
+                updating = false;
             }
 
+            string categoryName = CatalogIndex.GetCategoryName(filter.Category).ToLowerInvariant();
             status.Text = currentResults.TotalCount > currentResults.Items.Count
-                ? "Showing " + currentResults.Items.Count + " of " + currentResults.TotalCount + "; refine search"
-                : currentResults.TotalCount + " definitions";
+                ? "Showing " + currentResults.Items.Count + " of " + currentResults.TotalCount + " " + categoryName
+                : currentResults.TotalCount + " " + categoryName;
+
+            if (list.Value != null)
+                RaiseSelectionChanged(list.Value.AssocMember);
+
+            Action resultsHandler = ResultsChanged;
+            if (resultsHandler != null)
+                resultsHandler();
+        }
+
+        public void RebuildCatalog(IEnumerable<PlanetSnapshot> planets)
+        {
+            catalog = new CatalogIndex(definitions, planets);
+            Refresh();
         }
 
         public bool TrySelect(DefinitionDocument definition)
@@ -90,40 +194,61 @@ namespace SEpedia.UI
             if (definition == null)
                 return false;
 
-            for (int itemIndex = 0; itemIndex < list.EntryList.Count; itemIndex++)
+            for (int index = 0; index < list.EntryList.Count; index++)
             {
-                if (list.EntryList[itemIndex].AssocMember.Id == definition.Id)
+                CatalogEntry entry = list.EntryList[index].AssocMember;
+                if (entry.Definition != null && entry.Definition.Id == definition.Id)
                 {
-                    list.SetSelectionAt(itemIndex);
+                    list.SetSelectionAt(index);
                     return true;
                 }
             }
-
             return false;
+        }
+
+        private void OnCategoryChanged(object sender, EventArgs args)
+        {
+            if (updating || categories.Value == null)
+                return;
+
+            filter.Category = categories.Value.AssocMember;
+            Refresh();
         }
 
         private void OnSelectionChanged(object sender, EventArgs args)
         {
-            if (list.Value != null && SelectionChanged != null)
-                SelectionChanged(list.Value.AssocMember);
+            if (!updating && list.Value != null)
+                RaiseSelectionChanged(list.Value.AssocMember);
         }
 
-        private static string GetCategoryLabel(DefinitionDocument definition)
+        private void RaiseSelectionChanged(CatalogEntry entry)
         {
-            if ((definition.Categories & DefinitionCategory.Component) != 0)
-                return "Component";
-            if ((definition.Categories & DefinitionCategory.Ore) != 0)
-                return "Ore";
-            if ((definition.Categories & DefinitionCategory.Ingot) != 0)
-                return "Ingot";
-            if ((definition.Categories & DefinitionCategory.CubeBlock) != 0)
-                return "Block";
-            if ((definition.Categories & DefinitionCategory.Blueprint) != 0)
-                return "Recipe";
-            if ((definition.Categories & DefinitionCategory.PhysicalItem) != 0)
-                return "Item";
+            Action<CatalogEntry> handler = SelectionChanged;
+            if (handler != null)
+                handler(entry);
+        }
 
-            return "Definition";
+        private static string GetEntryLabel(CatalogEntry entry)
+        {
+            if (entry.IsSpawnedPlanet)
+                return "Spawned planet";
+            if (entry.Definition.AsteroidGenerator != null)
+                return "Asteroid generator";
+            if (entry.Definition.PlanetGenerator != null)
+                return "Planet definition";
+            switch (entry.Category)
+            {
+                case BrowseCategory.Components: return "Component";
+                case BrowseCategory.Ores: return "Ore";
+                case BrowseCategory.Ingots: return "Ingot";
+                case BrowseCategory.Ammo: return "Ammo";
+                case BrowseCategory.ToolsAndWeapons: return "Tool / weapon";
+                case BrowseCategory.Consumables: return "Consumable";
+                case BrowseCategory.GasBottles: return "Gas bottle";
+                case BrowseCategory.Items: return "Item";
+                case BrowseCategory.Blocks: return "Block";
+                default: return "Entry";
+            }
         }
     }
 }

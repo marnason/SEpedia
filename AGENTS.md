@@ -42,6 +42,8 @@ MUST and MUST NOT are requirements. SHOULD is the default unless repository evid
 - Treat MDK analyzer and packager diagnostics as part of the build result; do not report success while relevant warnings or errors remain unexplained.
 - Confirm packaged output when a change affects content layout, packaging, or deployment.
 - Runtime, lifecycle, multiplayer, dedicated-server, or Rich HUD behavior MUST receive a proportionate in-game check when the environment permits it. Report any verification that remains manual or unavailable.
+- For Rich HUD interaction or layering changes, inspect the matching Rich HUD Master implementation as well as the client API, and explicitly test text entry, gameplay-input suppression, vanilla-HUD overlap, and state restoration in game before treating the behavior as verified.
+- Before using player-targeted APIs, verify the required identifier and default-argument semantics from primary documentation; do not assume `0` means the local player. Temporary player state changes MUST preserve the previous value, target the local identity explicitly, and restore only state the mod still owns on every close, reset, failure, and unload path.
 
 ## Skills
 

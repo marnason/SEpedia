@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Sandbox.Definitions;
+using VRage.Collections;
 using VRage.Game;
 
 namespace SEpedia.Core
@@ -46,8 +47,14 @@ namespace SEpedia.Core
             IssueCount = issueCount;
         }
 
-        public static DefinitionIndex Build(IEnumerable<MyDefinitionBase> definitions, Action<string> logWarning)
+        public static DefinitionIndex Build(MyDefinitionManager manager, bool survivalMode, Action<string> logWarning)
         {
+            if (manager == null)
+                throw new ArgumentNullException("manager");
+
+            var sourceDefinitions = new List<MyDefinitionBase>(manager.GetAllDefinitions());
+            HashSet<MyDefinitionId> buildMenuReachable = BuildMenuReachability(manager, sourceDefinitions, survivalMode, logWarning);
+            Dictionary<MyDefinitionId, List<MyDefinitionId>> blockRelationships = BuildBlockRelationships(manager, logWarning);
             var documents = new List<DefinitionDocument>();
             var recipes = new List<RecipeDocument>();
             var blockUsage = new Dictionary<MyDefinitionId, List<BlockUsage>>();
@@ -56,7 +63,7 @@ namespace SEpedia.Core
             int skippedCount = 0;
             int issueCount = 0;
 
-            foreach (MyDefinitionBase definition in definitions)
+            foreach (MyDefinitionBase definition in sourceDefinitions)
             {
                 sourceCount++;
 
@@ -83,6 +90,9 @@ namespace SEpedia.Core
                     PhysicalItemData physicalData = null;
                     RecipeDocument recipeData = null;
                     CubeBlockData blockData = null;
+                    PlanetGeneratorData planetGeneratorData = null;
+                    AsteroidGeneratorData asteroidGeneratorData = null;
+                    BrowseCategory browseCategory = BrowseCategory.None;
 
                     MyPhysicalItemDefinition physicalDefinition = definition as MyPhysicalItemDefinition;
                     if (physicalDefinition != null)
@@ -92,6 +102,7 @@ namespace SEpedia.Core
                             categories |= DefinitionCategory.Component;
 
                         TryExtractPhysical(physicalDefinition, ref categories, out physicalData, ref issueCount, logWarning);
+                        browseCategory = GetPhysicalBrowseCategory(physicalDefinition);
                     }
 
                     MyBlueprintDefinitionBase blueprintDefinition = definition as MyBlueprintDefinitionBase;
@@ -107,7 +118,28 @@ namespace SEpedia.Core
                     if (blockDefinition != null)
                     {
                         categories |= DefinitionCategory.CubeBlock;
-                        blockData = ExtractBlock(blockDefinition, blockUsage, ref issueCount, logWarning);
+                        browseCategory = BrowseCategory.Blocks;
+                        blockData = ExtractBlock(
+                            blockDefinition,
+                            buildMenuReachable.Contains(blockDefinition.Id),
+                            blockRelationships,
+                            blockUsage,
+                            ref issueCount,
+                            logWarning);
+                    }
+
+                    MyPlanetGeneratorDefinition planetGenerator = definition as MyPlanetGeneratorDefinition;
+                    if (planetGenerator != null)
+                    {
+                        browseCategory = BrowseCategory.Celestial;
+                        planetGeneratorData = ExtractPlanetGenerator(planetGenerator, ref issueCount, logWarning);
+                    }
+
+                    MyAsteroidGeneratorDefinition asteroidGenerator = definition as MyAsteroidGeneratorDefinition;
+                    if (asteroidGenerator != null)
+                    {
+                        browseCategory = BrowseCategory.Celestial;
+                        asteroidGeneratorData = ExtractAsteroidGenerator(asteroidGenerator, ref issueCount, logWarning);
                     }
 
                     documents.Add(new DefinitionDocument(
@@ -116,13 +148,16 @@ namespace SEpedia.Core
                         GetDescription(definition),
                         definition.GetType().FullName ?? definition.GetType().Name,
                         categories,
+                        browseCategory,
                         GetOrigin(definition, ref issueCount, logWarning),
                         definition.Enabled,
                         definition.Public,
                         definition.AvailableInSurvival,
                         physicalData,
                         recipeData,
-                        blockData));
+                        blockData,
+                        planetGeneratorData,
+                        asteroidGeneratorData));
                 }
                 catch (Exception exception)
                 {
@@ -133,6 +168,209 @@ namespace SEpedia.Core
             }
 
             return new DefinitionIndex(documents, recipes, blockUsage, sourceCount, skippedCount, issueCount);
+        }
+
+        private static HashSet<MyDefinitionId> BuildMenuReachability(
+            MyDefinitionManager manager,
+            IList<MyDefinitionBase> definitions,
+            bool survivalMode,
+            Action<string> logWarning)
+        {
+            var reachable = new HashSet<MyDefinitionId>();
+
+            for (int index = 0; index < definitions.Count; index++)
+            {
+                MyCubeBlockDefinition block = definitions[index] as MyCubeBlockDefinition;
+                if (block == null)
+                    continue;
+
+                try
+                {
+                    if (block.GuiVisible)
+                        reachable.Add(block.Id);
+
+                    MyBlockVariantGroup attachedGroup = block.BlockVariantsGroup;
+                    if (attachedGroup != null && attachedGroup.Enabled && attachedGroup.Public &&
+                        (!survivalMode || attachedGroup.AvailableInSurvival) && attachedGroup.Blocks != null)
+                    {
+                        for (int variantIndex = 0; variantIndex < attachedGroup.Blocks.Length; variantIndex++)
+                        {
+                            if (attachedGroup.Blocks[variantIndex] != null)
+                                reachable.Add(attachedGroup.Blocks[variantIndex].Id);
+                        }
+                    }
+                }
+                catch (Exception exception)
+                {
+                    Warn(logWarning, "Could not read G-menu visibility for " + block.Id + ": " + exception.Message);
+                }
+            }
+
+            try
+            {
+                DictionaryReader<string, MyBlockVariantGroup> groups = manager.GetBlockVariantGroupDefinitions();
+                foreach (KeyValuePair<string, MyBlockVariantGroup> pair in groups)
+                {
+                    try
+                    {
+                        MyBlockVariantGroup group = pair.Value;
+                        if (group == null || !group.Enabled || !group.Public || (survivalMode && !group.AvailableInSurvival))
+                            continue;
+
+                        MyCubeBlockDefinition[] blocks = group.Blocks;
+                        if (blocks == null)
+                            continue;
+
+                        for (int index = 0; index < blocks.Length; index++)
+                        {
+                            try
+                            {
+                                if (blocks[index] != null)
+                                    reachable.Add(blocks[index].Id);
+                            }
+                            catch (Exception exception)
+                            {
+                                Warn(logWarning, "Skipped malformed block variant in " + pair.Key + ": " + exception.Message);
+                            }
+                        }
+                    }
+                    catch (Exception exception)
+                    {
+                        Warn(logWarning, "Skipped malformed block variant group " + pair.Key + ": " + exception.Message);
+                    }
+                }
+            }
+            catch (Exception exception)
+            {
+                Warn(logWarning, "Could not enumerate block variant groups: " + exception.Message);
+            }
+
+            try
+            {
+                DictionaryReader<string, MyCubeBlockDefinitionGroup> pairs = manager.GetDefinitionPairs();
+                foreach (KeyValuePair<string, MyCubeBlockDefinitionGroup> pair in pairs)
+                {
+                    try
+                    {
+                        MyCubeBlockDefinition small = pair.Value.Small;
+                        MyCubeBlockDefinition large = pair.Value.Large;
+                        if ((small != null && reachable.Contains(small.Id)) || (large != null && reachable.Contains(large.Id)))
+                        {
+                            if (small != null)
+                                reachable.Add(small.Id);
+                            if (large != null)
+                                reachable.Add(large.Id);
+                        }
+                    }
+                    catch (Exception exception)
+                    {
+                        Warn(logWarning, "Skipped malformed block pair " + pair.Key + ": " + exception.Message);
+                    }
+                }
+            }
+            catch (Exception exception)
+            {
+                Warn(logWarning, "Could not enumerate block definition pairs: " + exception.Message);
+            }
+
+            return reachable;
+        }
+
+        private static BrowseCategory GetPhysicalBrowseCategory(MyPhysicalItemDefinition definition)
+        {
+            if (definition is MyComponentDefinition)
+                return BrowseCategory.Components;
+            if (definition.IsOre)
+                return BrowseCategory.Ores;
+            if (definition.IsIngot)
+                return BrowseCategory.Ingots;
+            if (definition is MyAmmoMagazineDefinition)
+                return BrowseCategory.Ammo;
+            if (definition is MyOxygenContainerDefinition)
+                return BrowseCategory.GasBottles;
+            if (definition is MyConsumableItemDefinition)
+                return BrowseCategory.Consumables;
+            if (definition is MyToolItemDefinition || definition is MyWeaponItemDefinition)
+                return BrowseCategory.ToolsAndWeapons;
+            return BrowseCategory.Items;
+        }
+
+        private static Dictionary<MyDefinitionId, List<MyDefinitionId>> BuildBlockRelationships(
+            MyDefinitionManager manager,
+            Action<string> logWarning)
+        {
+            var relationships = new Dictionary<MyDefinitionId, List<MyDefinitionId>>();
+            try
+            {
+                foreach (KeyValuePair<string, MyBlockVariantGroup> pair in manager.GetBlockVariantGroupDefinitions())
+                {
+                    try
+                    {
+                        MyCubeBlockDefinition[] blocks = pair.Value != null ? pair.Value.Blocks : null;
+                        if (blocks == null)
+                            continue;
+                        for (int left = 0; left < blocks.Length; left++)
+                        {
+                            if (blocks[left] == null)
+                                continue;
+                            for (int right = 0; right < blocks.Length; right++)
+                            {
+                                if (left != right && blocks[right] != null)
+                                    AddBlockRelationship(relationships, blocks[left].Id, blocks[right].Id);
+                            }
+                        }
+                    }
+                    catch (Exception exception)
+                    {
+                        Warn(logWarning, "Skipped malformed relationships in block variant group " + pair.Key + ": " + exception.Message);
+                    }
+                }
+            }
+            catch (Exception exception)
+            {
+                Warn(logWarning, "Could not snapshot block variant relationships: " + exception.Message);
+            }
+
+            try
+            {
+                foreach (KeyValuePair<string, MyCubeBlockDefinitionGroup> pair in manager.GetDefinitionPairs())
+                {
+                    try
+                    {
+                        MyCubeBlockDefinition small = pair.Value.Small;
+                        MyCubeBlockDefinition large = pair.Value.Large;
+                        if (small != null && large != null)
+                        {
+                            AddBlockRelationship(relationships, small.Id, large.Id);
+                            AddBlockRelationship(relationships, large.Id, small.Id);
+                        }
+                    }
+                    catch (Exception exception)
+                    {
+                        Warn(logWarning, "Skipped malformed relationships in block pair " + pair.Key + ": " + exception.Message);
+                    }
+                }
+            }
+            catch (Exception exception)
+            {
+                Warn(logWarning, "Could not snapshot paired block relationships: " + exception.Message);
+            }
+            return relationships;
+        }
+
+        private static void AddBlockRelationship(
+            IDictionary<MyDefinitionId, List<MyDefinitionId>> relationships,
+            MyDefinitionId source,
+            MyDefinitionId target)
+        {
+            List<MyDefinitionId> related;
+            if (!relationships.TryGetValue(source, out related))
+            {
+                related = new List<MyDefinitionId>();
+                relationships.Add(source, related);
+            }
+            if (!related.Contains(target))
+                related.Add(target);
         }
 
         public bool TryGet(MyDefinitionId id, out DefinitionDocument definition)
@@ -238,6 +476,8 @@ namespace SEpedia.Core
 
         private static CubeBlockData ExtractBlock(
             MyCubeBlockDefinition definition,
+            bool buildMenuReachable,
+            IDictionary<MyDefinitionId, List<MyDefinitionId>> blockRelationships,
             IDictionary<MyDefinitionId, List<BlockUsage>> blockUsage,
             ref int issueCount,
             Action<string> logWarning)
@@ -277,12 +517,141 @@ namespace SEpedia.Core
                     }
                 }
 
-                return new CubeBlockData(definition.CubeSize, definition.Size, definition.PCU, requirements);
+                List<MyDefinitionId> relatedBlocks;
+                if (!blockRelationships.TryGetValue(definition.Id, out relatedBlocks))
+                    relatedBlocks = new List<MyDefinitionId>();
+
+                return new CubeBlockData(
+                    definition.CubeSize,
+                    definition.Size,
+                    definition.PCU,
+                    definition.GuiVisible,
+                    buildMenuReachable,
+                    definition.BlockPairName,
+                    relatedBlocks,
+                    requirements);
             }
             catch (Exception exception)
             {
                 issueCount++;
                 Warn(logWarning, "Could not read cube block data for " + definition.Id + ": " + exception.Message);
+                return null;
+            }
+        }
+
+        private static PlanetGeneratorData ExtractPlanetGenerator(
+            MyPlanetGeneratorDefinition definition,
+            ref int issueCount,
+            Action<string> logWarning)
+        {
+            try
+            {
+                var weatherTypes = new List<string>();
+                if (definition.WeatherGenerators != null)
+                {
+                    for (int generatorIndex = 0; generatorIndex < definition.WeatherGenerators.Count; generatorIndex++)
+                    {
+                        try
+                        {
+                            MyWeatherGeneratorSettings generator = definition.WeatherGenerators[generatorIndex];
+                            if (generator == null || generator.Weathers == null)
+                                continue;
+                            for (int weatherIndex = 0; weatherIndex < generator.Weathers.Count; weatherIndex++)
+                            {
+                                MyWeatherGeneratorVoxelSettings weather = generator.Weathers[weatherIndex];
+                                if (weather != null && !string.IsNullOrWhiteSpace(weather.Name))
+                                    weatherTypes.Add(weather.Name + " (weight " + weather.Weight + ")");
+                            }
+                        }
+                        catch (Exception exception)
+                        {
+                            issueCount++;
+                            Warn(logWarning, "Skipped weather entry in " + definition.Id + ": " + exception.Message);
+                        }
+                    }
+                }
+
+                var ores = new List<PlanetOreData>();
+                if (definition.OreMappings != null)
+                {
+                    for (int index = 0; index < definition.OreMappings.Length; index++)
+                    {
+                        try
+                        {
+                            MyPlanetOreMapping ore = definition.OreMappings[index];
+                            if (ore != null)
+                                ores.Add(new PlanetOreData(ore.Type, ore.Start, ore.Depth));
+                        }
+                        catch (Exception exception)
+                        {
+                            issueCount++;
+                            Warn(logWarning, "Skipped ore mapping in " + definition.Id + ": " + exception.Message);
+                        }
+                    }
+                }
+
+                MyPlanetAtmosphere atmosphere = definition.Atmosphere;
+                return new PlanetGeneratorData(
+                    definition.SurfaceGravity,
+                    definition.GravityFalloffPower,
+                    definition.HasAtmosphere,
+                    definition.AtmosphereHeight,
+                    atmosphere != null && atmosphere.Breathable,
+                    atmosphere != null ? atmosphere.Density : 0f,
+                    atmosphere != null ? atmosphere.OxygenDensity : 0f,
+                    atmosphere != null ? atmosphere.LimitAltitude : 0f,
+                    atmosphere != null ? atmosphere.MaxWindSpeed : 0f,
+                    definition.DefaultSurfaceTemperature.ToString(),
+                    definition.WeatherFrequencyMin,
+                    definition.WeatherFrequencyMax,
+                    definition.PersistentWeather,
+                    weatherTypes,
+                    ores);
+            }
+            catch (Exception exception)
+            {
+                issueCount++;
+                Warn(logWarning, "Could not read planet generator data for " + definition.Id + ": " + exception.Message);
+                return null;
+            }
+        }
+
+        private static AsteroidGeneratorData ExtractAsteroidGenerator(
+            MyAsteroidGeneratorDefinition definition,
+            ref int issueCount,
+            Action<string> logWarning)
+        {
+            try
+            {
+                var seedProbabilities = new List<string>();
+                foreach (KeyValuePair<MyObjectSeedType, double> pair in definition.SeedTypeProbability)
+                    seedProbabilities.Add(pair.Key + ": " + pair.Value.ToString("0.###"));
+
+                var clusterProbabilities = new List<string>();
+                foreach (KeyValuePair<MyObjectSeedType, double> pair in definition.SeedClusterTypeProbability)
+                    clusterProbabilities.Add(pair.Key + ": " + pair.Value.ToString("0.###"));
+
+                return new AsteroidGeneratorData(
+                    definition.Version,
+                    definition.ObjectSizeMin,
+                    definition.ObjectSizeMax,
+                    definition.ObjectSizeMinCluster,
+                    definition.ObjectSizeMaxCluster,
+                    definition.ObjectMaxInCluster,
+                    definition.ObjectMinDistanceInCluster,
+                    definition.ObjectMaxDistanceInClusterMin,
+                    definition.ObjectMaxDistanceInClusterMax,
+                    definition.ObjectDensityCluster,
+                    definition.ClusterDispersionAbsolute,
+                    definition.RotateAsteroids,
+                    definition.UseClusterVariableSize,
+                    seedProbabilities,
+                    clusterProbabilities);
+            }
+            catch (Exception exception)
+            {
+                issueCount++;
+                Warn(logWarning, "Could not read asteroid generator data for " + definition.Id + ": " + exception.Message);
                 return null;
             }
         }

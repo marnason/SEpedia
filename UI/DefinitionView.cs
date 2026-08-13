@@ -40,7 +40,9 @@ namespace SEpedia.UI
             AddHeading(definition.DisplayName);
             AddKeyValue("ID", definition.Id.ToString());
             AddKeyValue("Type", definition.RuntimeTypeName);
-            AddKeyValue("Categories", definition.Categories == DefinitionCategory.None ? "Generic definition" : definition.Categories.ToString());
+            AddKeyValue("Categories", definition.BrowseCategory != BrowseCategory.None
+                ? CatalogIndex.GetCategoryName(definition.BrowseCategory)
+                : (definition.Categories == DefinitionCategory.None ? "Linked definition" : definition.Categories.ToString()));
             AddKeyValue("Origin", definition.Origin.DisplayName);
 
             if (!definition.Origin.IsVanilla)
@@ -79,8 +81,28 @@ namespace SEpedia.UI
             if (definition.CubeBlock != null)
                 AddBlock(definition.CubeBlock);
 
+            if (definition.PlanetGenerator != null)
+                AddPlanetGenerator(definition.PlanetGenerator);
+
+            if (definition.AsteroidGenerator != null)
+                AddAsteroidGenerator(definition.AsteroidGenerator);
+
             AddReverseRelationships(definition.Id);
             content.Start = 0;
+        }
+
+        public void Show(CatalogEntry entry)
+        {
+            if (entry == null)
+            {
+                ShowMessage("Select an entry to inspect it.");
+                return;
+            }
+
+            if (entry.Definition != null)
+                Show(entry.Definition);
+            else
+                ShowPlanet(entry.Planet);
         }
 
         public void ShowMessage(string message)
@@ -118,6 +140,17 @@ namespace SEpedia.UI
             AddKeyValue("Grid size", block.CubeSize.ToString());
             AddKeyValue("Dimensions", block.Size.X + " × " + block.Size.Y + " × " + block.Size.Z);
             AddKeyValue("PCU", block.Pcu.ToString());
+            AddKeyValue("GUI visible", YesNo(block.GuiVisible));
+            AddKeyValue("G-menu reachable", YesNo(block.BuildMenuReachable));
+            if (!string.IsNullOrWhiteSpace(block.BlockPairName))
+                AddKeyValue("Block pair", block.BlockPairName);
+
+            if (block.RelatedBlocks.Count > 0)
+            {
+                AddSubheading("Variants and paired sizes");
+                for (int index = 0; index < block.RelatedBlocks.Count; index++)
+                    AddDefinitionLink(block.RelatedBlocks[index], string.Empty);
+            }
 
             AddSubheading("Components");
             if (block.Components.Count == 0)
@@ -131,6 +164,108 @@ namespace SEpedia.UI
                 BlockComponentRequirement requirement = block.Components[componentIndex];
                 AddDefinitionLink(requirement.ComponentId, requirement.Count + " × ");
             }
+        }
+
+        private void ShowPlanet(PlanetSnapshot planet)
+        {
+            ClearRows();
+            AddHeading(planet.DisplayName);
+            AddKeyValue("Entity ID", planet.EntityId.ToString());
+            AddKeyValue("Type", "Spawned planet");
+            AddKeyValue("Position", FormatVector(planet.Position));
+            AddKeyValue("Minimum radius", FormatDistance(planet.MinimumRadius));
+            AddKeyValue("Average radius", FormatDistance(planet.AverageRadius));
+            AddKeyValue("Maximum radius", FormatDistance(planet.MaximumRadius));
+            AddKeyValue("Has atmosphere", YesNo(planet.HasAtmosphere));
+            AddKeyValue("Atmosphere radius", FormatDistance(planet.AtmosphereRadius));
+            AddKeyValue("Atmosphere altitude", FormatDistance(planet.AtmosphereAltitude));
+            AddKeyValue("Origin", planet.Origin.DisplayName);
+            if (!planet.Origin.IsVanilla)
+            {
+                if (!string.IsNullOrWhiteSpace(planet.Origin.ModId))
+                    AddKeyValue("Mod ID", planet.Origin.ModId);
+                if (!string.IsNullOrWhiteSpace(planet.Origin.ServiceName))
+                    AddKeyValue("Service", planet.Origin.ServiceName);
+            }
+            AddKeyValue("Inherited flags", planet.HasGeneratorMetadata
+                ? "Enabled: " + YesNo(planet.Enabled)
+                    + "   Public: " + YesNo(planet.Public)
+                    + "   Survival: " + YesNo(planet.AvailableInSurvival)
+                : "Unknown (generator definition unavailable)");
+
+            if (planet.GeneratorId.HasValue)
+            {
+                AddSection("Generator");
+                AddDefinitionLink(planet.GeneratorId.Value, string.Empty);
+            }
+            else
+            {
+                AddKeyValue("Generator", "Unknown");
+            }
+
+            if (planet.GeneratorData != null)
+                AddPlanetGenerator(planet.GeneratorData);
+
+            content.Start = 0;
+        }
+
+        private void AddPlanetGenerator(PlanetGeneratorData planet)
+        {
+            AddSection("Planet statistics");
+            AddKeyValue("Surface gravity", planet.SurfaceGravity.ToString("0.###") + " g");
+            AddKeyValue("Gravity falloff", planet.GravityFalloffPower.ToString("0.###"));
+            AddKeyValue("Atmosphere", planet.HasAtmosphere ? "Yes" : "No");
+            AddKeyValue("Atmosphere height", planet.AtmosphereHeight.ToString("0.###"));
+            AddKeyValue("Breathable", YesNo(planet.AtmosphereBreathable));
+            AddKeyValue("Atmosphere density", planet.AtmosphereDensity.ToString("0.###"));
+            AddKeyValue("Oxygen density", planet.OxygenDensity.ToString("0.###"));
+            AddKeyValue("Atmosphere limit", planet.AtmosphereLimitAltitude.ToString("0.###"));
+            AddKeyValue("Maximum wind", planet.MaxWindSpeed.ToString("0.###"));
+            AddKeyValue("Temperature", planet.DefaultTemperature);
+            AddKeyValue("Weather interval", planet.WeatherFrequencyMin + "–" + planet.WeatherFrequencyMax);
+            if (!string.IsNullOrWhiteSpace(planet.PersistentWeather))
+                AddKeyValue("Persistent weather", planet.PersistentWeather);
+            if (planet.WeatherTypes.Count > 0)
+            {
+                AddSubheading("Weather types");
+                for (int index = 0; index < planet.WeatherTypes.Count; index++)
+                    AddParagraph(planet.WeatherTypes[index]);
+            }
+            if (planet.Ores.Count > 0)
+            {
+                AddSubheading("Ore mappings");
+                for (int index = 0; index < planet.Ores.Count; index++)
+                {
+                    PlanetOreData ore = planet.Ores[index];
+                    AddParagraph(ore.Material + " — start " + ore.Start.ToString("0.###") + ", depth " + ore.Depth.ToString("0.###"));
+                }
+            }
+        }
+
+        private void AddAsteroidGenerator(AsteroidGeneratorData asteroid)
+        {
+            AddSection("Asteroid generation");
+            AddKeyValue("Version", asteroid.Version.ToString());
+            AddKeyValue("Object size", asteroid.ObjectSizeMin + "–" + asteroid.ObjectSizeMax);
+            AddKeyValue("Cluster object size", asteroid.ClusterObjectSizeMin + "–" + asteroid.ClusterObjectSizeMax);
+            AddKeyValue("Maximum objects", asteroid.MaxObjectsInCluster.ToString());
+            AddKeyValue("Minimum spacing", asteroid.MinClusterDistance.ToString());
+            AddKeyValue("Maximum spacing", asteroid.MaxClusterDistanceMin + "–" + asteroid.MaxClusterDistanceMax);
+            AddKeyValue("Cluster density", asteroid.ClusterDensity.ToString("0.###"));
+            AddKeyValue("Absolute dispersion", YesNo(asteroid.AbsoluteClusterDispersion));
+            AddKeyValue("Rotate asteroids", YesNo(asteroid.RotateAsteroids));
+            AddKeyValue("Variable cluster size", YesNo(asteroid.VariableClusterSize));
+            AddStringList("Object probabilities", asteroid.SeedProbabilities);
+            AddStringList("Cluster probabilities", asteroid.ClusterSeedProbabilities);
+        }
+
+        private void AddStringList(string heading, IReadOnlyList<string> values)
+        {
+            if (values.Count == 0)
+                return;
+            AddSubheading(heading);
+            for (int index = 0; index < values.Count; index++)
+                AddParagraph(values[index]);
         }
 
         private void AddReverseRelationships(MyDefinitionId definitionId)
@@ -265,6 +400,18 @@ namespace SEpedia.UI
         private static string YesNo(bool value)
         {
             return value ? "Yes" : "No";
+        }
+
+        private static string FormatDistance(float metres)
+        {
+            return metres >= 1000f
+                ? (metres / 1000f).ToString("0.###") + " km"
+                : metres.ToString("0.###") + " m";
+        }
+
+        private static string FormatVector(VRageMath.Vector3D value)
+        {
+            return value.X.ToString("0.##") + ", " + value.Y.ToString("0.##") + ", " + value.Z.ToString("0.##");
         }
     }
 }

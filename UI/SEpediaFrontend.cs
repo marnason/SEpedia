@@ -9,6 +9,9 @@ namespace SEpedia.UI
         private BindingConfigController bindings;
         private EncyclopediaWindow window;
         private DefinitionIndex index;
+        private CelestialIndex celestial;
+        private CatalogFilter filter;
+        private bool survivalMode;
         private bool pendingOpen;
 
         public void InitializeRichHud()
@@ -29,10 +32,20 @@ namespace SEpedia.UI
             }
         }
 
-        public void AttachIndex(DefinitionIndex definitionIndex)
+        public void AttachIndex(DefinitionIndex definitionIndex, CelestialIndex celestialIndex, bool isSurvivalMode)
         {
             index = definitionIndex;
+            celestial = celestialIndex;
+            survivalMode = isSurvivalMode;
+            if (filter == null)
+                filter = new CatalogFilter(survivalMode);
             TryCreateWindow();
+        }
+
+        public void RefreshCelestial()
+        {
+            if (window != null)
+                window.RefreshCelestial();
         }
 
         public void PollBindings()
@@ -56,6 +69,8 @@ namespace SEpedia.UI
         {
             CloseRichHudObjects(true);
             index = null;
+            celestial = null;
+            filter = null;
             pendingOpen = false;
         }
 
@@ -66,7 +81,7 @@ namespace SEpedia.UI
 
             try
             {
-                window = new EncyclopediaWindow(index, HudMain.HighDpiRoot);
+                window = new EncyclopediaWindow(index, celestial, filter, survivalMode, HudMain.HighDpiRoot);
                 if (pendingOpen)
                 {
                     pendingOpen = false;

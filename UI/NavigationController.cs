@@ -51,9 +51,15 @@ namespace SEpedia.UI
             view.LinkClicked -= NavigateTo;
         }
 
-        private void OnListSelectionChanged(DefinitionDocument definition)
+        private void OnListSelectionChanged(CatalogEntry entry)
         {
-            NavigateTo(definition, false);
+            if (entry == null)
+                return;
+
+            if (entry.Definition != null)
+                NavigateTo(entry.Definition, false);
+            else
+                view.Show(entry);
         }
     }
 }
