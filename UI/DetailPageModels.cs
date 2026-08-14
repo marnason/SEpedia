@@ -71,7 +71,6 @@ namespace SEpedia.UI
         public string Id { get; private set; }
         public string RuntimeType { get; private set; }
         public string Description { get; private set; }
-        public DefinitionIconData Icon { get; private set; }
         public IReadOnlyList<DetailRowModel> Rows { get; private set; }
 
         public DetailPageModel(
@@ -79,14 +78,12 @@ namespace SEpedia.UI
             string id,
             string runtimeType,
             string description,
-            DefinitionIconData icon,
             IList<DetailRowModel> rows)
         {
             Title = title ?? string.Empty;
             Id = id ?? string.Empty;
             RuntimeType = runtimeType ?? string.Empty;
             Description = description ?? string.Empty;
-            Icon = icon;
             Rows = new List<DetailRowModel>(rows).AsReadOnly();
         }
     }

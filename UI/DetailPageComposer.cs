@@ -50,17 +50,11 @@ namespace SEpedia.UI
                 definition.Id.ToString(),
                 definition.RuntimeTypeName,
                 definition.Description,
-                definition.Icon,
                 rows);
         }
 
         public DetailPageModel Compose(PlanetSnapshot planet)
         {
-            DefinitionIconData icon = null;
-            DefinitionDocument generator;
-            if (planet.GeneratorId.HasValue && index.TryGet(planet.GeneratorId.Value, out generator))
-                icon = generator.Icon;
-
             var rows = new List<DetailRowModel>();
             AddField(rows, "Position", FormatVector(planet.Position));
             AddField(rows, "Minimum radius", FormatDistance(planet.MinimumRadius));
@@ -90,7 +84,6 @@ namespace SEpedia.UI
                 planet.EntityId.ToString(),
                 "Spawned planet",
                 string.Empty,
-                icon,
                 rows);
         }
 

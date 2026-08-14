@@ -167,7 +167,6 @@ namespace SEpedia.Core
         public string DisplayName { get; private set; }
         public string Description { get; private set; }
         public string RuntimeTypeName { get; private set; }
-        public DefinitionIconData Icon { get; private set; }
         public DefinitionCategory Categories { get; private set; }
         public BrowseCategory BrowseCategory { get; private set; }
         public DefinitionOrigin Origin { get; private set; }
@@ -190,7 +189,6 @@ namespace SEpedia.Core
             string displayName,
             string description,
             string runtimeTypeName,
-            DefinitionIconData icon,
             DefinitionCategory categories,
             BrowseCategory browseCategory,
             DefinitionOrigin origin,
@@ -207,7 +205,6 @@ namespace SEpedia.Core
             DisplayName = displayName;
             Description = description;
             RuntimeTypeName = runtimeTypeName;
-            Icon = icon;
             Categories = categories;
             BrowseCategory = browseCategory;
             Origin = origin;

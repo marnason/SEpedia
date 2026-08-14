@@ -87,7 +87,7 @@ namespace SEpedia.UI
         private void Render(DetailPageModel page)
         {
             ClearRows();
-            header.Update(page.Title, page.Id, page.RuntimeType, page.Description, page.Icon);
+            header.Update(page.Title, page.Id, page.RuntimeType, page.Description);
             AddRow(header.Root);
 
             for (int index = 0; index < page.Rows.Count; index++)

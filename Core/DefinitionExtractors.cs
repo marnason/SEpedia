@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using Sandbox.Definitions;
 using VRage.Game;
 
@@ -8,16 +7,13 @@ namespace SEpedia.Core
     internal sealed class DefinitionExtractors
     {
         private readonly DefinitionRelationships relationships;
-        private readonly DefinitionIconResolver iconResolver;
         private readonly DefinitionBuildDiagnostics diagnostics;
 
         public DefinitionExtractors(
             DefinitionRelationships relationships,
-            DefinitionIconResolver iconResolver,
             DefinitionBuildDiagnostics diagnostics)
         {
             this.relationships = relationships;
-            this.iconResolver = iconResolver;
             this.diagnostics = diagnostics;
         }
 
@@ -79,13 +75,11 @@ namespace SEpedia.Core
                 asteroid = CelestialDefinitionExtractor.ExtractAsteroid(asteroidDefinition, diagnostics);
             }
 
-            List<string> icons = GetIcons(definition);
             return new DefinitionDocument(
                 id,
                 GetDisplayName(definition, id),
                 GetDescription(definition),
                 definition.GetType().FullName ?? definition.GetType().Name,
-                iconResolver.Resolve(definition, icons),
                 categories,
                 browseCategory,
                 GetOrigin(definition),
@@ -164,27 +158,6 @@ namespace SEpedia.Core
                 diagnostics.Report("description-fallback", "Could not read fallback description for " + definition.Id, exception);
                 return string.Empty;
             }
-        }
-
-        private List<string> GetIcons(MyDefinitionBase definition)
-        {
-            var icons = new List<string>();
-            try
-            {
-                if (definition.Icons != null)
-                {
-                    for (int index = 0; index < definition.Icons.Length; index++)
-                    {
-                        if (!string.IsNullOrWhiteSpace(definition.Icons[index]))
-                            icons.Add(definition.Icons[index]);
-                    }
-                }
-            }
-            catch (Exception exception)
-            {
-                diagnostics.Report("definition-icons", "Could not read " + definition.Id, exception);
-            }
-            return icons;
         }
 
         private static BrowseCategory GetPhysicalBrowseCategory(MyPhysicalItemDefinition definition)

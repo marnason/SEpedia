@@ -22,8 +22,7 @@ namespace SEpedia.Core
                 sourceDefinitions,
                 survivalMode,
                 diagnostics);
-            var iconResolver = new DefinitionIconResolver(manager, diagnostics);
-            var extractors = new DefinitionExtractors(relationships, iconResolver, diagnostics);
+            var extractors = new DefinitionExtractors(relationships, diagnostics);
             var documents = new List<DefinitionDocument>();
             var ids = new HashSet<MyDefinitionId>();
 
@@ -61,8 +60,7 @@ namespace SEpedia.Core
             return new DefinitionIndex(
                 documents,
                 sourceDefinitions.Count,
-                diagnostics.IssueCount,
-                iconResolver.GetStats());
+                diagnostics.IssueCount);
         }
 
         private static List<MyDefinitionBase> CollectDefinitions(

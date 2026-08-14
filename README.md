@@ -12,7 +12,7 @@ SEpedia covers physical items, components, ores, ingots, ammunition, tools and w
 
 ## Current limitations
 
-- Base-game definition icons render, including when a modded definition reuses a base-game icon. Arbitrary mod-owned icon textures currently fall back to a text-only header while [research continues](docs/ICON_RESEARCH.md).
+- Definition details are intentionally text-only; SEpedia does not collect or render definition-supplied icons.
 - Runtime acceptance still requires an interactive game client. Builds cannot verify Rich HUD input focus, HUD restoration, layout, or heavily modded performance.
 - The frontend does not run on dedicated servers.
 
@@ -26,11 +26,5 @@ The project targets .NET Framework 4.8 and C# 6 through MDK². Machine-local MDK
 ```
 
 `verify.sh` performs a headless compile-only build and the script-sandbox guard. `deploy.sh` performs a non-interactive Release package/deploy using the locally configured MDK destination. Do not invoke a bare MDK build in automation because its default behavior may open an interactive window.
-
-Regenerate the tracked base-game icon aliases from a local Space Engineers Content directory with:
-
-```bash
-python3 scripts/generate-vanilla-icon-aliases.py "/path/to/SpaceEngineers/Content" Content/Data/SEpediaVanillaIconAliases.sbc
-```
 
 Architecture and runtime ownership are described in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). Third-party provenance is recorded in [THIRD_PARTY.md](THIRD_PARTY.md).

@@ -136,11 +136,6 @@ namespace SEpedia
                     built.Recipes.Count + " recipes (" + built.Recipes.MenuCount + " production-menu reachable), with " +
                     built.IssueCount + " isolated issues in " +
                     stopwatch.ElapsedMilliseconds + " ms.");
-                SEpediaLog.Info(
-                    "Icon resolution: " + built.IconStats.RenderableDefinitions + " of " +
-                    built.IconStats.DefinitionsWithIcons + " definitions renderable through packaged aliases; " +
-                    built.IconStats.UnresolvedDefinitions + " unresolved and " +
-                    built.IconStats.LayerLimitDefinitions + " above the layer limit.");
 
                 if (frontend != null)
                     frontend.AttachIndex(built, celestialIndex, survivalMode);

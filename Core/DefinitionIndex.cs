@@ -15,13 +15,11 @@ namespace SEpedia.Core
         public RecipeIndex Recipes { get; private set; }
         public int SourceCount { get; private set; }
         public int IssueCount { get; private set; }
-        public DefinitionIconStats IconStats { get; private set; }
 
         public DefinitionIndex(
             IList<DefinitionDocument> definitions,
             int sourceCount,
-            int issueCount,
-            DefinitionIconStats iconStats)
+            int issueCount)
         {
             var sorted = new List<DefinitionDocument>(definitions);
             sorted.Sort(CompareDefinitions);
@@ -52,7 +50,6 @@ namespace SEpedia.Core
             Recipes = new RecipeIndex(recipes);
             SourceCount = sourceCount;
             IssueCount = issueCount;
-            IconStats = iconStats;
         }
 
         public bool TryGet(MyDefinitionId id, out DefinitionDocument definition)
