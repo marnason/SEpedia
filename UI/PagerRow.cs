@@ -7,6 +7,8 @@ namespace SEpedia.UI
 {
     internal sealed class PagerRow
     {
+        #region State and Construction
+
         private readonly LabelBoxButton previous;
         private readonly Label pageLabel;
         private readonly LabelBoxButton next;
@@ -43,6 +45,10 @@ namespace SEpedia.UI
             UpdateVisuals();
         }
 
+        #endregion
+
+        #region Paging
+
         public void Configure(int itemCount, int pageSize)
         {
             pageCount = Math.Max(1, (itemCount + pageSize - 1) / pageSize);
@@ -62,6 +68,10 @@ namespace SEpedia.UI
                 pageChanged();
         }
 
+        #endregion
+
+        #region Rendering
+
         private void UpdateVisuals()
         {
             Root.Visible = pageCount > 1;
@@ -71,6 +81,10 @@ namespace SEpedia.UI
             previous.Color = previous.InputEnabled ? UiTheme.Panel : UiTheme.Disabled;
             next.Color = next.InputEnabled ? UiTheme.Panel : UiTheme.Disabled;
         }
+
+        #endregion
+
+        #region Control Construction
 
         private static LabelBoxButton CreateButton(string text, string toolTip)
         {
@@ -88,5 +102,7 @@ namespace SEpedia.UI
             button.MouseInput.ToolTip = toolTip;
             return button;
         }
+
+        #endregion
     }
 }

@@ -7,6 +7,8 @@ namespace SEpedia.UI
 {
     internal sealed class DefinitionHeader
     {
+        #region State and Construction
+
         private readonly HudChain textChain;
         private readonly Label title;
         private readonly Label description;
@@ -53,6 +55,10 @@ namespace SEpedia.UI
             Root.Add(textChain, 1f);
         }
 
+        #endregion
+
+        #region Content
+
         public void Update(
             string text,
             string id,
@@ -68,6 +74,10 @@ namespace SEpedia.UI
                 GlyphFormat.White.WithAlignment(TextAlignment.Center).WithSize(.82f));
         }
 
+        #endregion
+
+        #region Layout
+
         public void SetWidth(float width)
         {
             Root.Width = width;
@@ -77,5 +87,7 @@ namespace SEpedia.UI
             description.Width = textWidth;
             description.LineWrapWidth = Math.Max(60f, textWidth - description.Padding.X);
         }
+
+        #endregion
     }
 }

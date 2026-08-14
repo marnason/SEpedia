@@ -8,6 +8,8 @@ namespace SEpedia.Core
 {
     internal sealed class DefinitionRelationships
     {
+        #region State and Construction
+
         private static readonly IReadOnlyList<MyDefinitionId> EmptyIds =
             new List<MyDefinitionId>().AsReadOnly();
 
@@ -24,6 +26,10 @@ namespace SEpedia.Core
             this.productionBlocksByRecipe = productionBlocksByRecipe;
             this.relatedBlocks = relatedBlocks;
         }
+
+        #endregion
+
+        #region Relationship Queries
 
         public static DefinitionRelationships Build(
             MyDefinitionManager manager,
@@ -53,6 +59,10 @@ namespace SEpedia.Core
             List<MyDefinitionId> blocks;
             return relatedBlocks.TryGetValue(blockId, out blocks) ? blocks : EmptyIds;
         }
+
+        #endregion
+
+        #region Production Menu Discovery
 
         private static Dictionary<MyDefinitionId, List<MyDefinitionId>> BuildProductionMenuReachability(
             IList<MyDefinitionBase> definitions,
@@ -109,6 +119,10 @@ namespace SEpedia.Core
 
             return reachable;
         }
+
+        #endregion
+
+        #region Build Menu Discovery
 
         private static HashSet<MyDefinitionId> BuildMenuReachability(
             MyDefinitionManager manager,
@@ -208,6 +222,10 @@ namespace SEpedia.Core
             return reachable;
         }
 
+        #endregion
+
+        #region Block Relationship Discovery
+
         private static Dictionary<MyDefinitionId, List<MyDefinitionId>> BuildBlockRelationships(
             MyDefinitionManager manager,
             DefinitionBuildDiagnostics diagnostics)
@@ -286,6 +304,10 @@ namespace SEpedia.Core
             return relationships;
         }
 
+        #endregion
+
+        #region Collection Helpers
+
         private static void AddBlocks(HashSet<MyDefinitionId> reachable, MyCubeBlockDefinition[] blocks)
         {
             for (int index = 0; index < blocks.Length; index++)
@@ -309,5 +331,7 @@ namespace SEpedia.Core
             if (!related.Contains(target))
                 related.Add(target);
         }
+
+        #endregion
     }
 }

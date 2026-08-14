@@ -10,6 +10,8 @@ namespace SEpedia.UI
 {
     internal sealed class AdvancedFilterDrawer : HudElementBase
     {
+        #region State
+
         public event Action FiltersChanged;
         public event Action ResetRequested;
 
@@ -25,6 +27,10 @@ namespace SEpedia.UI
         private readonly PagedFacetSection blockTypes;
         private readonly PagedFacetSection sources;
         private bool updating;
+
+        #endregion
+
+        #region Construction
 
         public AdvancedFilterDrawer(CatalogFilter filter, HudParentBase parent = null) : base(parent)
         {
@@ -93,7 +99,6 @@ namespace SEpedia.UI
                 "All block types",
                 filter.SelectedBlockTypes,
                 true,
-                delegate { return updating; },
                 RaiseChanged,
                 blockOnlyEntries);
 
@@ -103,9 +108,12 @@ namespace SEpedia.UI
                 "All sources",
                 filter.SelectedSourceKeys,
                 false,
-                delegate { return updating; },
                 RaiseChanged);
         }
+
+        #endregion
+
+        #region Filter Synchronization
 
         public void Refresh(CatalogResult result)
         {
@@ -138,6 +146,10 @@ namespace SEpedia.UI
                 updating = false;
             }
         }
+
+        #endregion
+
+        #region Control Construction
 
         private Dropdown<TriStateFilter> AddTriState(
             string name,
@@ -225,11 +237,17 @@ namespace SEpedia.UI
             return entry;
         }
 
+        #endregion
+
+        #region Event Dispatch
+
         private void RaiseChanged()
         {
             Action handler = FiltersChanged;
             if (handler != null)
                 handler();
         }
+
+        #endregion
     }
 }

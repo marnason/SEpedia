@@ -7,6 +7,8 @@ namespace SEpedia.Core
 {
     internal static class DefinitionIndexBuilder
     {
+        #region Index Construction
+
         public static DefinitionIndex Build(
             MyDefinitionManager manager,
             bool survivalMode,
@@ -63,6 +65,10 @@ namespace SEpedia.Core
                 diagnostics.IssueCount);
         }
 
+        #endregion
+
+        #region Registry Enumeration
+
         private static List<MyDefinitionBase> CollectDefinitions(
             MyDefinitionManager manager,
             DefinitionBuildDiagnostics diagnostics)
@@ -107,5 +113,7 @@ namespace SEpedia.Core
 
             return definitions;
         }
+
+        #endregion
     }
 }

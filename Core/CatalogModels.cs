@@ -13,6 +13,8 @@ namespace SEpedia.Core
 
     internal sealed class CatalogEntry
     {
+        #region State
+
         public DefinitionDocument Definition { get; private set; }
         public PlanetSnapshot Planet { get; private set; }
         public BrowseCategory Category { get; private set; }
@@ -54,6 +56,10 @@ namespace SEpedia.Core
             }
         }
 
+        #endregion
+
+        #region Construction
+
         public CatalogEntry(DefinitionDocument definition, int celestialSortOrder, string listDetail = null)
         {
             Definition = definition;
@@ -73,10 +79,14 @@ namespace SEpedia.Core
             ListDetail = string.Empty;
             CelestialSortOrder = 0;
         }
+
+        #endregion
     }
 
     internal sealed class CatalogFilter
     {
+        #region State
+
         public BrowseCategory Category { get; set; }
         public string SearchText { get; set; }
         public TriStateFilter EnabledState { get; set; }
@@ -86,6 +96,10 @@ namespace SEpedia.Core
         public HashSet<string> SelectedSourceKeys { get; private set; }
         public HashSet<MyCubeSize> SelectedGridSizes { get; private set; }
         public HashSet<string> SelectedBlockTypes { get; private set; }
+
+        #endregion
+
+        #region Construction and Reset
 
         public CatalogFilter(bool survivalMode)
         {
@@ -109,6 +123,10 @@ namespace SEpedia.Core
             SelectedGridSizes.Add(MyCubeSize.Large);
             SelectedBlockTypes.Clear();
         }
+
+        #endregion
+
+        #region Category and Facet Reconciliation
 
         public void NormalizeForCategory()
         {
@@ -149,6 +167,8 @@ namespace SEpedia.Core
             selected.RemoveWhere(delegate(string key) { return !keys.Contains(key); });
             return selected.Count != originalCount;
         }
+
+        #endregion
     }
 
     internal sealed class FacetCount

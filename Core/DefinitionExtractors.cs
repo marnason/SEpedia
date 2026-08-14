@@ -6,6 +6,8 @@ namespace SEpedia.Core
 {
     internal sealed class DefinitionExtractors
     {
+        #region State and Construction
+
         private readonly DefinitionRelationships relationships;
         private readonly DefinitionBuildDiagnostics diagnostics;
 
@@ -17,10 +19,13 @@ namespace SEpedia.Core
             this.diagnostics = diagnostics;
         }
 
+        #endregion
+
+        #region Definition Extraction
+
         public DefinitionDocument Extract(MyDefinitionBase definition)
         {
             MyDefinitionId id = definition.Id;
-            DefinitionCategory categories = DefinitionCategory.None;
             BrowseCategory browseCategory = BrowseCategory.None;
             PhysicalItemData physical = null;
             RecipeDocument recipe = null;
@@ -31,17 +36,13 @@ namespace SEpedia.Core
             MyPhysicalItemDefinition physicalDefinition = definition as MyPhysicalItemDefinition;
             if (physicalDefinition != null)
             {
-                categories |= DefinitionCategory.PhysicalItem;
-                if (definition is MyComponentDefinition)
-                    categories |= DefinitionCategory.Component;
-                physical = PhysicalDefinitionExtractor.Extract(physicalDefinition, ref categories, diagnostics);
+                physical = PhysicalDefinitionExtractor.Extract(physicalDefinition, diagnostics);
                 browseCategory = GetPhysicalBrowseCategory(physicalDefinition);
             }
 
             MyBlueprintDefinitionBase blueprintDefinition = definition as MyBlueprintDefinitionBase;
             if (blueprintDefinition != null)
             {
-                categories |= DefinitionCategory.Blueprint;
                 recipe = ProductionDefinitionExtractor.Extract(
                     blueprintDefinition,
                     relationships,
@@ -53,7 +54,6 @@ namespace SEpedia.Core
             MyCubeBlockDefinition blockDefinition = definition as MyCubeBlockDefinition;
             if (blockDefinition != null)
             {
-                categories |= DefinitionCategory.CubeBlock;
                 browseCategory = BrowseCategory.Blocks;
                 block = CubeBlockDefinitionExtractor.Extract(
                     blockDefinition,
@@ -80,7 +80,6 @@ namespace SEpedia.Core
                 GetDisplayName(definition, id),
                 GetDescription(definition),
                 definition.GetType().FullName ?? definition.GetType().Name,
-                categories,
                 browseCategory,
                 GetOrigin(definition),
                 definition.Enabled,
@@ -93,6 +92,10 @@ namespace SEpedia.Core
                 asteroid);
         }
 
+        #endregion
+
+        #region Safe Metadata Access
+
         private DefinitionOrigin GetOrigin(MyDefinitionBase definition)
         {
             try
@@ -104,8 +107,7 @@ namespace SEpedia.Core
                         context.IsBaseGame,
                         context.ModName,
                         context.ModId,
-                        context.ModServiceName,
-                        context.CurrentFile);
+                        context.ModServiceName);
             }
             catch (Exception exception)
             {
@@ -160,6 +162,10 @@ namespace SEpedia.Core
             }
         }
 
+        #endregion
+
+        #region Category Selection
+
         private static BrowseCategory GetPhysicalBrowseCategory(MyPhysicalItemDefinition definition)
         {
             if (definition is MyComponentDefinition) return BrowseCategory.Components;
@@ -172,5 +178,7 @@ namespace SEpedia.Core
                 return BrowseCategory.ToolsAndWeapons;
             return BrowseCategory.Items;
         }
+
+        #endregion
     }
 }

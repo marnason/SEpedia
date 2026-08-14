@@ -9,18 +9,11 @@ namespace SEpedia.Core
     {
         public static PhysicalItemData Extract(
             MyPhysicalItemDefinition definition,
-            ref DefinitionCategory categories,
             DefinitionBuildDiagnostics diagnostics)
         {
             try
             {
-                if (definition.IsOre) categories |= DefinitionCategory.Ore;
-                if (definition.IsIngot) categories |= DefinitionCategory.Ingot;
-                return new PhysicalItemData(
-                    definition.Mass,
-                    definition.Volume,
-                    definition.MaxStackAmount,
-                    definition.HasIntegralAmounts);
+                return new PhysicalItemData(definition.Mass, definition.Volume);
             }
             catch (Exception exception)
             {
@@ -114,7 +107,6 @@ namespace SEpedia.Core
                     definition.CubeSize,
                     definition.Size,
                     definition.PCU,
-                    definition.GuiVisible,
                     relationships.IsBuildMenuReachable(definition.Id),
                     definition.BlockPairName,
                     new List<MyDefinitionId>(relationships.GetRelatedBlocks(definition.Id)),

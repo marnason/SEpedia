@@ -4,10 +4,10 @@
 
 SEpedia vendors a source snapshot under `RichHudFramework/` so the mod can compile against the Rich HUD client API without a runtime assembly dependency.
 
-- Upstream projects: [RichHudFramework](https://github.com/ZachHembree/RichHudFramework) and [RichHudFramework.Shared](https://github.com/ZachHembree/RichHudFramework.Shared)
+- Upstream projects: [RichHudFramework.Client](https://github.com/ZachHembree/RichHudFramework.Client) and [RichHudFramework.Shared](https://github.com/ZachHembree/RichHudFramework.Shared)
 - License: MIT; preserved in `RichHudFramework/LICENSE` and `RichHudFramework/Shared/LICENSE`
 - Shared upstream commit recorded by the vendored subrepo metadata: `92acc3b644219e8308beea0750bdd8e2153dfe73`
-- Repository tree IDs at the maintenance baseline:
+- Vendored repository tree IDs:
   - `RichHudFramework/`: `cc63ff832c8f8caa55a9c976b2f4ea81a80b1c29`
   - `RichHudFramework/Client/`: `ed5546f2e9fdf877483804e5562ae5acffa4a697`
   - `RichHudFramework/Shared/`: `42b95fd100c93afef2dd8c2e02642bacbb02d470`

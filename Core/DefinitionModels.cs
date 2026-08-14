@@ -1,24 +1,9 @@
-using System;
 using System.Collections.Generic;
-using Sandbox.Definitions;
-using VRage;
 using VRage.Game;
 using VRageMath;
 
 namespace SEpedia.Core
 {
-    [Flags]
-    internal enum DefinitionCategory
-    {
-        None = 0,
-        PhysicalItem = 1,
-        Component = 2,
-        Ore = 4,
-        Ingot = 8,
-        CubeBlock = 16,
-        Blueprint = 32
-    }
-
     internal enum BrowseCategory
     {
         None = 0,
@@ -37,14 +22,15 @@ namespace SEpedia.Core
 
     internal sealed class DefinitionOrigin
     {
+        #region State
+
         private static readonly DefinitionOrigin UnknownValue =
-            new DefinitionOrigin(false, string.Empty, string.Empty, string.Empty, string.Empty);
+            new DefinitionOrigin(false, string.Empty, string.Empty, string.Empty);
 
         public bool IsVanilla { get; private set; }
         public string ModName { get; private set; }
         public string ModId { get; private set; }
         public string ServiceName { get; private set; }
-        public string SourceFile { get; private set; }
 
         public string DisplayName
         {
@@ -79,29 +65,30 @@ namespace SEpedia.Core
             get { return UnknownValue; }
         }
 
-        public DefinitionOrigin(bool isVanilla, string modName, string modId, string serviceName, string sourceFile)
+        #endregion
+
+        #region Construction
+
+        public DefinitionOrigin(bool isVanilla, string modName, string modId, string serviceName)
         {
             IsVanilla = isVanilla;
             ModName = modName ?? string.Empty;
             ModId = modId ?? string.Empty;
             ServiceName = serviceName ?? string.Empty;
-            SourceFile = sourceFile ?? string.Empty;
         }
+
+        #endregion
     }
 
     internal sealed class PhysicalItemData
     {
         public float Mass { get; private set; }
         public float Volume { get; private set; }
-        public MyFixedPoint MaxStackAmount { get; private set; }
-        public bool HasIntegralAmounts { get; private set; }
 
-        public PhysicalItemData(float mass, float volume, MyFixedPoint maxStackAmount, bool hasIntegralAmounts)
+        public PhysicalItemData(float mass, float volume)
         {
             Mass = mass;
             Volume = volume;
-            MaxStackAmount = maxStackAmount;
-            HasIntegralAmounts = hasIntegralAmounts;
         }
     }
 
@@ -122,7 +109,6 @@ namespace SEpedia.Core
         public MyCubeSize CubeSize { get; private set; }
         public Vector3I Size { get; private set; }
         public int Pcu { get; private set; }
-        public bool IsGuiVisible { get; private set; }
         public bool IsBuildMenuReachable { get; private set; }
         public string BlockPairName { get; private set; }
         public IReadOnlyList<MyDefinitionId> RelatedBlocks { get; private set; }
@@ -132,7 +118,6 @@ namespace SEpedia.Core
             MyCubeSize cubeSize,
             Vector3I size,
             int pcu,
-            bool isGuiVisible,
             bool isBuildMenuReachable,
             string blockPairName,
             IList<MyDefinitionId> relatedBlocks,
@@ -141,7 +126,6 @@ namespace SEpedia.Core
             CubeSize = cubeSize;
             Size = size;
             Pcu = pcu;
-            IsGuiVisible = isGuiVisible;
             IsBuildMenuReachable = isBuildMenuReachable;
             BlockPairName = blockPairName ?? string.Empty;
             RelatedBlocks = new List<MyDefinitionId>(relatedBlocks).AsReadOnly();
@@ -163,11 +147,12 @@ namespace SEpedia.Core
 
     internal sealed class DefinitionDocument
     {
+        #region State
+
         public MyDefinitionId Id { get; private set; }
         public string DisplayName { get; private set; }
         public string Description { get; private set; }
         public string RuntimeTypeName { get; private set; }
-        public DefinitionCategory Categories { get; private set; }
         public BrowseCategory BrowseCategory { get; private set; }
         public DefinitionOrigin Origin { get; private set; }
         public bool IsEnabled { get; private set; }
@@ -184,12 +169,15 @@ namespace SEpedia.Core
             get { return Id.SubtypeName; }
         }
 
+        #endregion
+
+        #region Construction
+
         public DefinitionDocument(
             MyDefinitionId id,
             string displayName,
             string description,
             string runtimeTypeName,
-            DefinitionCategory categories,
             BrowseCategory browseCategory,
             DefinitionOrigin origin,
             bool isEnabled,
@@ -205,7 +193,6 @@ namespace SEpedia.Core
             DisplayName = displayName;
             Description = description;
             RuntimeTypeName = runtimeTypeName;
-            Categories = categories;
             BrowseCategory = browseCategory;
             Origin = origin;
             IsEnabled = isEnabled;
@@ -217,5 +204,7 @@ namespace SEpedia.Core
             PlanetGenerator = planetGenerator;
             AsteroidGenerator = asteroidGenerator;
         }
+
+        #endregion
     }
 }

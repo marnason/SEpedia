@@ -1,61 +1,38 @@
 # Workspace Instructions
 
-## Normative language
+MUST and MUST NOT are requirements. SHOULD is the default unless repository evidence justifies an exception. These rules apply to the workspace unless a closer `AGENTS.md` overrides them.
 
-MUST and MUST NOT are requirements. SHOULD is the default unless repository evidence justifies an exception. MAY is optional. These rules apply to the whole workspace unless a closer `AGENTS.md` overrides them.
+## Toolchain
 
-## Product and toolchain
+- SEpedia is a scripted C# Space Engineers mod built with MDK². Preserve the scaffold, analyzers, packager, references, and package versions unless the task requires changing them.
+- First-party code MUST remain compatible with .NET Framework 4.8 and C# 6 and MUST pass `scripts/check-script-sandbox.sh`. Do not suppress MDK diagnostics or use `#pragma warning`; the in-game compiler rejects prohibited members independently of local builds.
+- Use `SEpedia.sln`. Run routine verification through `scripts/verify.sh`; use `scripts/deploy.sh` only for an explicitly required local package or deployment. Do not automate a bare `dotnet build` because MDK may become interactive.
+- Portable code and guidance MUST NOT contain machine-specific paths, users, Steam roots, or deployment destinations.
 
-- SEpedia is a scripted C# mod for Space Engineers, built with MDK².
-- First-party script source MUST pass `scripts/check-script-sandbox.sh`. It MUST NOT suppress MDK diagnostics or use `#pragma warning`; the in-game compiler independently rejects prohibited members and the pragma itself even when a local build succeeds. Renderer experiments requiring prohibited types need a separately compiled dependency or an exposed framework API rather than suppressed script source.
-- The project MUST remain compatible with its configured .NET Framework 4.8 target and C# 6 language version. Do not use newer language features merely because the installed SDK accepts them elsewhere.
-- Use `SEpedia.sln` as the solution. Routine automated compilation MUST run through `scripts/verify.sh`; a raw `dotnet build` may invoke the MDK packager and MUST NOT be used as an automated verification shortcut. Explicitly requested local package/deploy builds MUST run through `scripts/deploy.sh`, which pins MDK to non-interactive mode.
-- Preserve the existing MDK² scaffold, analyzer, packager, reference packages, and package versions unless the active task requires changing them.
-- Do not hardcode WSL paths, Windows user names, Steam library roots, local deployment directories, or other machine-specific values in portable source or guidance.
+## Architecture and frontend
 
-## Architecture
+- Keep backend state independent of Rich HUD types. All game integration MUST use the public Space Engineers ModAPI; do not add plugins, patching, reflection into internals, external services, or custom infrastructure without approval.
+- Recipe indexing MUST enumerate `MyDefinitionManager.GetBlueprintDefinitions()` explicitly because `GetAllDefinitions()` omits blueprints.
+- Player-facing UI MUST use Rich HUD Master. Treat it as an optional client dependency, never initialize it on dedicated servers, and release registrations on reset and unload.
+- Check the maintained [Rich HUD client documentation](https://zachhembree.github.io/RichHudFramework.Client/index.html), [official example](https://github.com/ZachHembree/TextEditorExample), and matching vendored implementation before changing version-sensitive integration.
+- Definition-supplied icons MUST NOT be collected, resolved, packaged, or rendered. Headers remain text-only unless the user approves a new direction.
+- Bound or page runtime-sized Rich HUD collections. A `HudChain`-managed axis MUST have one layout owner; do not overwrite chain allocation with `DimAlignment` or manual compensation.
+- `RichHudFramework/` is vendored source. Do not reformat, reorganize, or otherwise mix vendor changes into normal first-party work.
 
-- Keep the backend deliberately small. It SHOULD contain only mod state, public Space Engineers game-event integration, and the data or operations needed by the frontend.
-- All backend interaction with Space Engineers MUST use the public Space Engineers ModAPI. Torch, server plugins, Harmony or other runtime patching, reflection into game internals, private APIs, external services, and custom server infrastructure MUST NOT be introduced without explicit user approval.
-- Rich HUD-specific types and lifecycle concerns SHOULD remain at the frontend boundary rather than leaking into backend state or domain interfaces.
-- Recipe indexing MUST enumerate `MyDefinitionManager.GetBlueprintDefinitions()` explicitly; `GetAllDefinitions()` does not include blueprint definitions.
-- Client-only frontend code MUST NOT execute on dedicated servers. Session, event, and UI registrations MUST be released when their owning mod lifecycle ends.
-- Prefer a useful vertical slice over speculative scaffolding. Do not create architectural layers, directories, abstractions, or extension points until concrete behavior justifies them.
+## Code organization
 
-## Frontend contract
-
-- Every player-facing interface MUST use Rich HUD Master unless the user explicitly approves a specific exception. This includes interactive controls, informational views, settings, prompts, and feedback.
-- Alternative HUD or UI frameworks, vanilla notification or chat UI, terminal-control UI, and bespoke billboard interfaces MUST NOT be used as frontend substitutes without explicit user approval.
-- Treat Rich HUD Master as an optional runtime dependency while it is loading or unavailable. Frontend initialization MUST wait for a ready client, fail safely, and avoid breaking backend behavior.
-- Consult the maintained [Rich HUD Framework client documentation](https://zachhembree.github.io/RichHudFramework.Client/index.html) and [official example mod](https://github.com/ZachHembree/TextEditorExample) before implementing its integration. Verify version-sensitive behavior from current primary sources instead of relying on memory or copied third-party snippets.
-- Definition-supplied icons MUST NOT be collected, stored, resolved, packaged, or rendered. Explicit hardcoded decorative icons MAY be added at the frontend boundary, but MUST NOT create or revive a generic definition-icon pipeline.
-- Runtime-sized data MUST NOT create an unbounded number of compound Rich HUD controls. Bound, page, or virtualize dynamic collections; inspect their per-frame layout and measurement work; and validate representative heavily modded counts in game before handoff.
-- Use nested `HudChain` containers for row-and-column layout. A chain-managed axis MUST have one layout owner: a weighted or member-fitted chain child MUST NOT also copy that axis with `DimAlignment`, because parent alignment runs after chain layout and can overwrite the allocated size. Do not compensate for layout conflicts with manual offsets.
-
-## Working discipline
-
-- Inspect the repository and relevant primary documentation before asking questions or proposing architecture. Ask only when an answer materially changes behavior, scope, or an established contract; state and proceed with low-risk assumptions otherwise.
-- Keep changes narrowly scoped. Do not refactor unrelated code or replace established project configuration as incidental cleanup.
-- A production dependency MAY be added when it solves a concrete requirement. Explain why existing capabilities are insufficient and verify the dependency against its primary documentation.
-- Preserve unrelated and pre-existing user changes. Never overwrite local configuration or generated assets merely to make a clean diff.
-- Keep repository-specific skills under `.agents/skills/`. MUST NOT create or install SEpedia skills in user-level Codex skill storage.
+- Use descriptive `#region` blocks in first-party classes with multiple functional areas. Regions SHOULD identify behavior such as lifecycle, querying, layout, persistence, or event handling; do not wrap tiny classes or individual methods without navigational value.
+- Prefer a concrete vertical slice over speculative layers or extension points. Keep repository-specific skills under `.agents/skills/`, never in user-level Codex storage.
 
 ## Verification
 
-- Run the cheapest checks that meaningfully cover the change, beginning with `scripts/verify.sh` for code or project changes. The script deliberately pins a non-packaging configuration and non-interactive MDK behavior; do not duplicate or improvise its command inline.
-- Before running or handing off an MDK² build, confirm that generated output and machine-local configuration are ignored and untracked while preserving required local copies. This includes `mdk.local.ini` and `<project>.mdk.local.ini`. Use `-p:MdkBuildConfiguration=CompileOnly` for compile-only iteration and `-p:MdkInteractive=no` for headless packaging. If a GUI action is unavoidable, tell the user exactly what will open and what they need to do before invoking it.
-- Treat MDK analyzer and packager diagnostics as part of the build result; do not report success while relevant warnings or errors remain unexplained.
-- Confirm packaged output when a change affects content layout, packaging, or deployment.
-- For runtime renderer experiments, track compile, package, load, and render outcomes separately. Remove or debug-gate experimental controls, labels, and assets before normal handoff.
-- Before a runtime experiment that can corrupt live definition or session state, disable autosave or take a restorable copy of the disposable save. When any rejection criterion fires, stop the game without saving before further UI inspection; pausing or backgrounding the game does not guarantee that autosave is inactive. Confirm save timestamps afterward and restore the disposable copy before another load.
-- Runtime, lifecycle, multiplayer, dedicated-server, or Rich HUD behavior MUST receive a proportionate in-game check when the environment permits it. Report any verification that remains manual or unavailable.
-- When mirroring a vanilla menu, eligibility MUST follow that menu's actual runtime collection and visibility semantics rather than substituting generic `MyDefinitionBase` flags. Confirm that at least one vanilla entry reaches every new browse category before handoff.
-- For Rich HUD interaction or layering changes, inspect the matching Rich HUD Master implementation as well as the client API, and explicitly test text entry, gameplay-input suppression, vanilla-HUD overlap, and state restoration in game before treating the behavior as verified.
-- For nested Rich HUD layout changes, resize the window through its minimum, default, and representative larger sizes in game and check every row and column for overlap, clipping, and unused space before treating the layout as verified.
-- Before using player-targeted APIs, verify the required identifier and default-argument semantics from primary documentation; do not assume `0` means the local player. Temporary player state changes MUST preserve the previous value, target the local identity explicitly, and restore only state the mod still owns on every close, reset, failure, and unload path.
+- Begin code or project verification with `scripts/verify.sh` and treat MDK warnings and errors as build failures. Confirm generated output and machine-local `mdk.local.ini` variants remain ignored and untracked.
+- Use `scripts/deploy.sh` for package/deploy checks and confirm packaged content when layout or content changes. Report runtime checks that cannot be performed.
+- UI, lifecycle, multiplayer, dedicated-server, or runtime-indexing changes require proportionate in-game verification. For Rich HUD changes, test text entry, gameplay-input suppression, vanilla-HUD overlap/restoration, reset, unload, and minimum/default/large layouts.
+- Before an experiment that can mutate live definition or session state, disable autosave or use a disposable save. Stop without saving on any integrity failure and restore the save before retrying.
+- When mirroring a vanilla menu, use its actual runtime eligibility semantics and confirm every browse category receives a vanilla entry.
+- Player-targeted APIs require verified identifier and default-argument semantics. Temporary state changes must target the local identity, preserve the prior value, and restore only state still owned by the mod.
 
 ## Skills
 
-Use the matching repo skill whenever its trigger applies:
-
-- `$learn-from-my-mistakes` immediately when Codex discovers that its own preventable mistake resulted from missing project knowledge, incomplete skill guidance or references, a skill trigger or routing gap, or verification that missed the real runtime boundary.
+- Use `$learn-from-my-mistakes` immediately when a preventable Codex mistake reveals missing project knowledge, routing, or runtime verification.

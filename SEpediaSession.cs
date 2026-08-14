@@ -13,6 +13,8 @@ namespace SEpedia
     [MySessionComponentDescriptor(MyUpdateOrder.AfterSimulation)]
     public sealed class SEpediaSession : MySessionComponentBase
     {
+        #region State
+
         private const int RetryDelayTicks = 300;
         private const int UiWarningDelayTicks = 600;
         private const int BindingPollTicks = 120;
@@ -24,6 +26,10 @@ namespace SEpedia
         private int nextBuildAttempt;
         private bool uiWarningLogged;
         private bool unloading;
+
+        #endregion
+
+        #region Session Lifecycle
 
         public override void Init(MyObjectBuilder_SessionComponent sessionComponent)
         {
@@ -97,6 +103,10 @@ namespace SEpedia
             base.UnloadData();
         }
 
+        #endregion
+
+        #region Index Construction
+
         private void TryBuildIndex()
         {
             MyDefinitionManager manager = MyDefinitionManager.Static;
@@ -150,6 +160,10 @@ namespace SEpedia
             }
         }
 
+        #endregion
+
+        #region Rich HUD and Entity Events
+
         private void OnRichHudReady()
         {
             if (unloading || frontend == null)
@@ -174,5 +188,7 @@ namespace SEpedia
             if (frontend != null)
                 frontend.ResetRichHud();
         }
+
+        #endregion
     }
 }

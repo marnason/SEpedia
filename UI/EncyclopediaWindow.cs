@@ -8,6 +8,8 @@ namespace SEpedia.UI
 {
     internal sealed class EncyclopediaWindow : WindowBase
     {
+        #region State
+
         private readonly bool survivalMode;
         private readonly CelestialIndex celestial;
         private readonly TextField searchField;
@@ -17,6 +19,10 @@ namespace SEpedia.UI
         private readonly NavigationController navigation;
         private readonly VanillaHudVisibilityController vanillaHud;
         private bool closed;
+
+        #endregion
+
+        #region Construction
 
         public EncyclopediaWindow(
             DefinitionIndex index,
@@ -88,6 +94,10 @@ namespace SEpedia.UI
                 definitionView.Show(definitionList.First);
         }
 
+        #endregion
+
+        #region Window Lifecycle
+
         public void Toggle()
         {
             if (closed)
@@ -137,6 +147,10 @@ namespace SEpedia.UI
             Unregister();
         }
 
+        #endregion
+
+        #region Layout
+
         protected override void Layout()
         {
             base.Layout();
@@ -145,6 +159,16 @@ namespace SEpedia.UI
             SetWidthIfChanged(filterDrawer, Math.Min(320f, Math.Max(250f, body.Width * .25f)));
             definitionList.UpdateCategoryLayout(body.Width);
         }
+
+        private static void SetWidthIfChanged(HudElementBase element, float width)
+        {
+            if (Math.Abs(element.Width - width) >= .01f)
+                element.Width = width;
+        }
+
+        #endregion
+
+        #region Search and Filter Events
 
         private void SearchChanged(object sender, EventArgs args)
         {
@@ -175,10 +199,6 @@ namespace SEpedia.UI
                 filterDrawer.Refresh(definitionList.CurrentResults);
         }
 
-        private static void SetWidthIfChanged(HudElementBase element, float width)
-        {
-            if (Math.Abs(element.Width - width) >= .01f)
-                element.Width = width;
-        }
+        #endregion
     }
 }

@@ -5,6 +5,8 @@ namespace SEpedia.Core
 {
     internal sealed class DefinitionIndex
     {
+        #region State
+
         private static readonly IReadOnlyList<BlockUsage> EmptyBlockUsages =
             new List<BlockUsage>().AsReadOnly();
 
@@ -15,6 +17,10 @@ namespace SEpedia.Core
         public RecipeIndex Recipes { get; private set; }
         public int SourceCount { get; private set; }
         public int IssueCount { get; private set; }
+
+        #endregion
+
+        #region Index Construction
 
         public DefinitionIndex(
             IList<DefinitionDocument> definitions,
@@ -52,17 +58,6 @@ namespace SEpedia.Core
             IssueCount = issueCount;
         }
 
-        public bool TryGet(MyDefinitionId id, out DefinitionDocument definition)
-        {
-            return byId.TryGetValue(id, out definition);
-        }
-
-        public IReadOnlyList<BlockUsage> GetBlocksUsing(MyDefinitionId itemId)
-        {
-            IReadOnlyList<BlockUsage> usages;
-            return blocksUsingItem.TryGetValue(itemId, out usages) ? usages : EmptyBlockUsages;
-        }
-
         private static void AddBlockUsage(
             IDictionary<MyDefinitionId, List<BlockUsage>> target,
             DefinitionDocument block)
@@ -80,6 +75,25 @@ namespace SEpedia.Core
                 usages.Add(new BlockUsage(block.Id, component.Count));
             }
         }
+
+        #endregion
+
+        #region Queries
+
+        public bool TryGet(MyDefinitionId id, out DefinitionDocument definition)
+        {
+            return byId.TryGetValue(id, out definition);
+        }
+
+        public IReadOnlyList<BlockUsage> GetBlocksUsing(MyDefinitionId itemId)
+        {
+            IReadOnlyList<BlockUsage> usages;
+            return blocksUsingItem.TryGetValue(itemId, out usages) ? usages : EmptyBlockUsages;
+        }
+
+        #endregion
+
+        #region Ordering
 
         private int CompareBlockUsages(BlockUsage left, BlockUsage right)
         {
@@ -107,5 +121,7 @@ namespace SEpedia.Core
                     right.Id.ToString(),
                     System.StringComparison.OrdinalIgnoreCase);
         }
+
+        #endregion
     }
 }

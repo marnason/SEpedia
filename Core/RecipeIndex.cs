@@ -5,33 +5,28 @@ namespace SEpedia.Core
 {
     internal sealed class RecipeIndex
     {
+        #region State
+
         private static readonly IReadOnlyList<RecipeDocument> EmptyRecipes = new List<RecipeDocument>().AsReadOnly();
 
-        private readonly Dictionary<MyDefinitionId, RecipeDocument> byId;
-        private readonly Dictionary<MyDefinitionId, IReadOnlyList<RecipeDocument>> producingByItem;
-        private readonly Dictionary<MyDefinitionId, IReadOnlyList<RecipeDocument>> consumingByItem;
         private readonly Dictionary<MyDefinitionId, IReadOnlyList<RecipeDocument>> menuProducingByItem;
         private readonly Dictionary<MyDefinitionId, IReadOnlyList<RecipeDocument>> menuConsumingByItem;
 
-        public int Count { get { return byId.Count; } }
+        public int Count { get; private set; }
         public int MenuCount { get; private set; }
+
+        #endregion
+
+        #region Index Construction
 
         public RecipeIndex(IEnumerable<RecipeDocument> recipes)
         {
-            byId = new Dictionary<MyDefinitionId, RecipeDocument>();
-
-            var producing = new Dictionary<MyDefinitionId, List<RecipeDocument>>();
-            var consuming = new Dictionary<MyDefinitionId, List<RecipeDocument>>();
             var menuProducing = new Dictionary<MyDefinitionId, List<RecipeDocument>>();
             var menuConsuming = new Dictionary<MyDefinitionId, List<RecipeDocument>>();
 
             foreach (RecipeDocument recipe in recipes)
             {
-                if (!byId.ContainsKey(recipe.DefinitionId))
-                    byId.Add(recipe.DefinitionId, recipe);
-
-                AddRelations(producing, recipe.Results, recipe);
-                AddRelations(consuming, recipe.Prerequisites, recipe);
+                Count++;
                 if (recipe.IsProductionMenuReachable)
                 {
                     MenuCount++;
@@ -40,28 +35,13 @@ namespace SEpedia.Core
                 }
             }
 
-            producingByItem = Freeze(producing);
-            consumingByItem = Freeze(consuming);
             menuProducingByItem = Freeze(menuProducing);
             menuConsumingByItem = Freeze(menuConsuming);
         }
 
-        public bool TryGet(MyDefinitionId recipeId, out RecipeDocument recipe)
-        {
-            return byId.TryGetValue(recipeId, out recipe);
-        }
+        #endregion
 
-        public IReadOnlyList<RecipeDocument> GetProducingRecipes(MyDefinitionId itemId)
-        {
-            IReadOnlyList<RecipeDocument> recipes;
-            return producingByItem.TryGetValue(itemId, out recipes) ? recipes : EmptyRecipes;
-        }
-
-        public IReadOnlyList<RecipeDocument> GetConsumingRecipes(MyDefinitionId itemId)
-        {
-            IReadOnlyList<RecipeDocument> recipes;
-            return consumingByItem.TryGetValue(itemId, out recipes) ? recipes : EmptyRecipes;
-        }
+        #region Relationship Queries
 
         public IReadOnlyList<RecipeDocument> GetMenuProducingRecipes(MyDefinitionId itemId)
         {
@@ -74,6 +54,10 @@ namespace SEpedia.Core
             IReadOnlyList<RecipeDocument> recipes;
             return menuConsumingByItem.TryGetValue(itemId, out recipes) ? recipes : EmptyRecipes;
         }
+
+        #endregion
+
+        #region Index Helpers
 
         private static void AddRelations(
             IDictionary<MyDefinitionId, List<RecipeDocument>> target,
@@ -106,5 +90,7 @@ namespace SEpedia.Core
 
             return result;
         }
+
+        #endregion
     }
 }

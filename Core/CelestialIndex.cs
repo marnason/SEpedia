@@ -8,6 +8,8 @@ namespace SEpedia.Core
 {
     internal sealed class CelestialIndex
     {
+        #region State
+
         public event Action Changed;
 
         private readonly DefinitionIndex definitions;
@@ -24,6 +26,10 @@ namespace SEpedia.Core
                 return result.AsReadOnly();
             }
         }
+
+        #endregion
+
+        #region Construction and Lifecycle
 
         public CelestialIndex(DefinitionIndex definitions, Action<string> logWarning)
         {
@@ -59,6 +65,10 @@ namespace SEpedia.Core
             planets.Clear();
             Changed = null;
         }
+
+        #endregion
+
+        #region Entity Tracking
 
         private void OnEntityAdd(IMyEntity entity)
         {
@@ -117,6 +127,10 @@ namespace SEpedia.Core
             }
         }
 
+        #endregion
+
+        #region Event Dispatch and Ordering
+
         private void RaiseChanged()
         {
             Action handler = Changed;
@@ -135,5 +149,7 @@ namespace SEpedia.Core
             int name = string.Compare(left.DisplayName, right.DisplayName, StringComparison.OrdinalIgnoreCase);
             return name != 0 ? name : left.EntityId.CompareTo(right.EntityId);
         }
+
+        #endregion
     }
 }

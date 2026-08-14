@@ -6,6 +6,8 @@ namespace SEpedia.Core
 {
     internal sealed class CatalogIndex
     {
+        #region Search State
+
         private sealed class SearchableEntry
         {
             public CatalogEntry Entry;
@@ -22,6 +24,10 @@ namespace SEpedia.Core
 
         private static readonly IReadOnlyList<SearchableEntry> EmptyEntries = new List<SearchableEntry>().AsReadOnly();
         private readonly Dictionary<BrowseCategory, List<SearchableEntry>> entriesByCategory;
+
+        #endregion
+
+        #region Index Construction
 
         public CatalogIndex(DefinitionIndex definitions, IEnumerable<PlanetSnapshot> planets)
         {
@@ -46,43 +52,6 @@ namespace SEpedia.Core
                 foreach (PlanetSnapshot planet in planets)
                     Add(new CatalogEntry(planet), definitions);
             }
-        }
-
-        public CatalogResult Query(CatalogFilter filter, int limit)
-        {
-            if (filter == null)
-                throw new ArgumentNullException("filter");
-
-            string query = Normalize(filter.SearchText).Trim();
-            string[] tokens = query.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
-            List<SearchableEntry> categoryList;
-            IReadOnlyList<SearchableEntry> categoryEntries = entriesByCategory.TryGetValue(filter.Category, out categoryList)
-                ? categoryList
-                : EmptyEntries;
-            List<FacetCount> sources;
-            List<FacetCount> blockTypes;
-            BuildFacets(categoryEntries, filter, query, tokens, out sources, out blockTypes);
-
-            var matches = new List<ScoredEntry>();
-
-            for (int index = 0; index < categoryEntries.Count; index++)
-            {
-                SearchableEntry searchable = categoryEntries[index];
-                if (!MatchesFilters(searchable.Entry, filter, false, false))
-                    continue;
-
-                int score = Score(searchable, query, tokens);
-                if (score >= 0)
-                    matches.Add(new ScoredEntry { Entry = searchable.Entry, Score = score });
-            }
-
-            matches.Sort(CompareScored);
-            int count = Math.Min(Math.Max(0, limit), matches.Count);
-            var result = new List<CatalogEntry>(count);
-            for (int index = 0; index < count; index++)
-                result.Add(matches[index].Entry);
-
-            return new CatalogResult(result, matches.Count, sources, blockTypes);
         }
 
         private void Add(CatalogEntry entry, DefinitionIndex definitions)
@@ -150,6 +119,51 @@ namespace SEpedia.Core
             return duplicates;
         }
 
+        #endregion
+
+        #region Catalog Queries
+
+        public CatalogResult Query(CatalogFilter filter, int limit)
+        {
+            if (filter == null)
+                throw new ArgumentNullException("filter");
+
+            string query = Normalize(filter.SearchText).Trim();
+            string[] tokens = query.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+            List<SearchableEntry> categoryList;
+            IReadOnlyList<SearchableEntry> categoryEntries = entriesByCategory.TryGetValue(filter.Category, out categoryList)
+                ? categoryList
+                : EmptyEntries;
+            List<FacetCount> sources;
+            List<FacetCount> blockTypes;
+            BuildFacets(categoryEntries, filter, query, tokens, out sources, out blockTypes);
+
+            var matches = new List<ScoredEntry>();
+
+            for (int index = 0; index < categoryEntries.Count; index++)
+            {
+                SearchableEntry searchable = categoryEntries[index];
+                if (!MatchesAllFilters(searchable.Entry, filter))
+                    continue;
+
+                int score = Score(searchable, query, tokens);
+                if (score >= 0)
+                    matches.Add(new ScoredEntry { Entry = searchable.Entry, Score = score });
+            }
+
+            matches.Sort(CompareScored);
+            int count = Math.Min(Math.Max(0, limit), matches.Count);
+            var result = new List<CatalogEntry>(count);
+            for (int index = 0; index < count; index++)
+                result.Add(matches[index].Entry);
+
+            return new CatalogResult(result, matches.Count, sources, blockTypes);
+        }
+
+        #endregion
+
+        #region Facet Calculation
+
         private void BuildFacets(
             IReadOnlyList<SearchableEntry> categoryEntries,
             CatalogFilter filter,
@@ -173,14 +187,14 @@ namespace SEpedia.Core
                     Score(searchable, query, tokens) < 0)
                     continue;
 
-                if (MatchesFilters(entry, filter, true, false))
+                if (MatchesBlockFilters(entry, filter) && MatchesBlockType(entry, filter))
                 {
                     string sourceKey = entry.Origin.SourceKey;
                     AddFacet(sourceCounts, sourceNames, sourceKey, entry.Origin.DisplayName);
                 }
 
                 if (filter.Category == BrowseCategory.Blocks &&
-                    MatchesFilters(entry, filter, false, true))
+                    MatchesSource(entry, filter) && MatchesBlockFilters(entry, filter))
                 {
                     DefinitionDocument definition = entry.Definition;
                     if (definition != null && definition.CubeBlock != null)
@@ -219,7 +233,19 @@ namespace SEpedia.Core
             return result;
         }
 
-        private static bool MatchesFilters(CatalogEntry entry, CatalogFilter filter, bool ignoreSource, bool ignoreBlockType)
+        #endregion
+
+        #region Filter Matching
+
+        private static bool MatchesAllFilters(CatalogEntry entry, CatalogFilter filter)
+        {
+            return MatchesCommonFilters(entry, filter) &&
+                MatchesSource(entry, filter) &&
+                MatchesBlockFilters(entry, filter) &&
+                MatchesBlockType(entry, filter);
+        }
+
+        private static bool MatchesCommonFilters(CatalogEntry entry, CatalogFilter filter)
         {
             if (entry.Category != filter.Category ||
                 !MatchesTriState(entry.IsEnabled, filter.EnabledState) ||
@@ -227,25 +253,31 @@ namespace SEpedia.Core
                 !MatchesTriState(entry.IsAvailableInSurvival, filter.SurvivalState))
                 return false;
 
-            if (!ignoreSource && filter.SelectedSourceKeys.Count > 0 &&
-                !filter.SelectedSourceKeys.Contains(entry.Origin.SourceKey))
-                return false;
-
-            if (filter.Category == BrowseCategory.Blocks)
-            {
-                DefinitionDocument definition = entry.Definition;
-                CubeBlockData block = definition != null ? definition.CubeBlock : null;
-                if (block == null ||
-                    !MatchesTriState(block.IsBuildMenuReachable, filter.BuildMenuState) ||
-                    !filter.SelectedGridSizes.Contains(block.CubeSize))
-                    return false;
-
-                if (!ignoreBlockType && filter.SelectedBlockTypes.Count > 0 &&
-                    !filter.SelectedBlockTypes.Contains(definition.RuntimeTypeName))
-                    return false;
-            }
-
             return true;
+        }
+
+        private static bool MatchesSource(CatalogEntry entry, CatalogFilter filter)
+        {
+            return filter.SelectedSourceKeys.Count == 0 ||
+                filter.SelectedSourceKeys.Contains(entry.Origin.SourceKey);
+        }
+
+        private static bool MatchesBlockFilters(CatalogEntry entry, CatalogFilter filter)
+        {
+            if (filter.Category != BrowseCategory.Blocks)
+                return true;
+
+            CubeBlockData block = entry.Definition != null ? entry.Definition.CubeBlock : null;
+            return block != null &&
+                MatchesTriState(block.IsBuildMenuReachable, filter.BuildMenuState) &&
+                filter.SelectedGridSizes.Contains(block.CubeSize);
+        }
+
+        private static bool MatchesBlockType(CatalogEntry entry, CatalogFilter filter)
+        {
+            return filter.Category != BrowseCategory.Blocks ||
+                filter.SelectedBlockTypes.Count == 0 ||
+                filter.SelectedBlockTypes.Contains(entry.Definition.RuntimeTypeName);
         }
 
         private static bool MatchesTriState(bool value, TriStateFilter filter)
@@ -254,6 +286,10 @@ namespace SEpedia.Core
                 (filter == TriStateFilter.Yes && value) ||
                 (filter == TriStateFilter.No && !value);
         }
+
+        #endregion
+
+        #region Search Scoring and Ordering
 
         private static int Score(SearchableEntry entry, string query, string[] tokens)
         {
@@ -318,5 +354,7 @@ namespace SEpedia.Core
         {
             return string.IsNullOrWhiteSpace(value) ? string.Empty : value.ToLowerInvariant();
         }
+
+        #endregion
     }
 }

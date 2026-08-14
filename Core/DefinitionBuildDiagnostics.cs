@@ -5,6 +5,8 @@ namespace SEpedia.Core
 {
     internal sealed class DefinitionBuildDiagnostics
     {
+        #region State and Construction
+
         private const int SampleLimit = 5;
 
         private readonly Action<string> logWarning;
@@ -17,6 +19,10 @@ namespace SEpedia.Core
             this.logWarning = logWarning;
             counts = new Dictionary<string, int>(StringComparer.Ordinal);
         }
+
+        #endregion
+
+        #region Reporting
 
         public void Report(string code, string message)
         {
@@ -52,5 +58,7 @@ namespace SEpedia.Core
                 }
             }
         }
+
+        #endregion
     }
 }

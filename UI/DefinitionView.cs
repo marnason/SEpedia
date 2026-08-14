@@ -10,6 +10,8 @@ namespace SEpedia.UI
 {
     internal sealed class DefinitionView : HudElementBase
     {
+        #region State and Construction
+
         public event Action<MyDefinitionId> LinkClicked;
 
         private readonly ScrollBox content;
@@ -40,6 +42,10 @@ namespace SEpedia.UI
             ShowMessage("Select a definition to inspect it.");
         }
 
+        #endregion
+
+        #region Navigation
+
         public void Show(DefinitionDocument definition)
         {
             Render(composer.Compose(definition));
@@ -63,6 +69,10 @@ namespace SEpedia.UI
             AddParagraph(message);
         }
 
+        #endregion
+
+        #region Layout
+
         protected override void Layout()
         {
             float rowWidth = Math.Max(120f, UnpaddedSize.X - content.ScrollBar.Width - content.Padding.X - 12f);
@@ -84,6 +94,10 @@ namespace SEpedia.UI
             layoutDirty = false;
         }
 
+        #endregion
+
+        #region Page Rendering
+
         private void Render(DetailPageModel page)
         {
             ClearRows();
@@ -101,12 +115,6 @@ namespace SEpedia.UI
                     case DetailRowKind.Field:
                         AddKeyValue(row.Label, row.Value);
                         break;
-                    case DetailRowKind.Paragraph:
-                        AddParagraph(row.Value);
-                        break;
-                    case DetailRowKind.Link:
-                        AddDefinitionLink(row.Link);
-                        break;
                     case DetailRowKind.PagedSection:
                         AddPagedSection(row.Label, row.Items, row.Major);
                         break;
@@ -115,34 +123,16 @@ namespace SEpedia.UI
             content.Start = 0;
         }
 
-        private void AddDefinitionLink(DetailItem item)
-        {
-            if (item == null || !item.LinkId.HasValue)
-            {
-                AddParagraph(item != null ? item.Text : string.Empty);
-                return;
-            }
-
-            MyDefinitionId id = item.LinkId.Value;
-            var link = new LabelButton
-            {
-                Text = new RichText(item.Text, GlyphFormat.Blueish.WithStyle(FontStyles.Underline).WithSize(.88f)),
-                BuilderMode = TextBuilderModes.Wrapped,
-                AutoResize = true,
-                VertCenterText = false,
-                Padding = new Vector2(12f, 2f)
-            };
-            link.MouseInput.LeftClicked += delegate { RaiseLinkClicked(id); };
-            AddRow(link);
-        }
-
         private void AddPagedSection(string heading, IReadOnlyList<DetailItem> items, bool major)
         {
-            var mutableItems = new List<DetailItem>(items);
-            var section = new PagedDetailSection(RaiseLinkClicked, heading, mutableItems, major);
+            var section = new PagedDetailSection(RaiseLinkClicked, heading, items, major);
             pagedSections.Add(section);
             AddRow(section.Root);
         }
+
+        #endregion
+
+        #region Row Construction
 
         private void AddSection(string text)
         {
@@ -198,11 +188,17 @@ namespace SEpedia.UI
             layoutDirty = true;
         }
 
+        #endregion
+
+        #region Event Dispatch
+
         private void RaiseLinkClicked(MyDefinitionId id)
         {
             Action<MyDefinitionId> handler = LinkClicked;
             if (handler != null)
                 handler(id);
         }
+
+        #endregion
     }
 }

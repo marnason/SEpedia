@@ -9,6 +9,8 @@ namespace SEpedia.UI
 {
     internal sealed class DetailPageComposer
     {
+        #region State and Construction
+
         private readonly DefinitionIndex index;
 
         public DetailPageComposer(DefinitionIndex index)
@@ -16,14 +18,13 @@ namespace SEpedia.UI
             this.index = index;
         }
 
+        #endregion
+
+        #region Page Composition
+
         public DetailPageModel Compose(DefinitionDocument definition)
         {
             var rows = new List<DetailRowModel>();
-            AddField(rows, "Categories", definition.BrowseCategory != BrowseCategory.None
-                ? CatalogText.GetCategoryName(definition.BrowseCategory)
-                : (definition.Categories == DefinitionCategory.None
-                    ? "Linked definition"
-                    : definition.Categories.ToString()));
             AddField(rows, "Origin", definition.Origin.DisplayName);
             AddField(rows, "Flags", "Enabled: " + YesNo(definition.IsEnabled)
                 + "   Public: " + YesNo(definition.IsPublic)
@@ -73,8 +74,12 @@ namespace SEpedia.UI
             }
             if (planet.GeneratorId.HasValue)
             {
-                AddHeading(rows, "Generator");
-                rows.Add(DetailRowModel.LinkRow(CreateDefinitionItem(planet.GeneratorId.Value, string.Empty)));
+                AddPaged(
+                    rows,
+                    "Generator",
+                    new List<DetailItem> { CreateDefinitionItem(planet.GeneratorId.Value, string.Empty) },
+                    true,
+                    false);
             }
             if (planet.GeneratorData != null)
                 AddPlanetGenerator(rows, planet.GeneratorData);
@@ -86,6 +91,10 @@ namespace SEpedia.UI
                 string.Empty,
                 rows);
         }
+
+        #endregion
+
+        #region Definition Sections
 
         private void AddRecipe(IList<DetailRowModel> rows, RecipeDocument recipe)
         {
@@ -104,7 +113,6 @@ namespace SEpedia.UI
             AddField(rows, "Grid size", block.CubeSize.ToString());
             AddField(rows, "Dimensions", block.Size.X + " × " + block.Size.Y + " × " + block.Size.Z);
             AddField(rows, "PCU", block.Pcu.ToString());
-            AddField(rows, "GUI visible", YesNo(block.IsGuiVisible));
             AddField(rows, "G-menu reachable", YesNo(block.IsBuildMenuReachable));
             if (!string.IsNullOrWhiteSpace(block.BlockPairName))
                 AddField(rows, "Block pair", block.BlockPairName);
@@ -168,6 +176,10 @@ namespace SEpedia.UI
             AddStrings(rows, "Object probabilities", asteroid.SeedProbabilities);
             AddStrings(rows, "Cluster probabilities", asteroid.ClusterSeedProbabilities);
         }
+
+        #endregion
+
+        #region Relationship Items
 
         private void AddReverseRelationships(IList<DetailRowModel> rows, MyDefinitionId definitionId)
         {
@@ -251,7 +263,7 @@ namespace SEpedia.UI
         {
             DefinitionDocument item;
             if (index.TryGet(itemId, out item) &&
-                (item.Categories & (DefinitionCategory.Ore | DefinitionCategory.Ingot)) != 0)
+                (item.BrowseCategory == BrowseCategory.Ores || item.BrowseCategory == BrowseCategory.Ingots))
                 return amount + " m³ ";
             return amount + " × ";
         }
@@ -266,6 +278,10 @@ namespace SEpedia.UI
             }
             return total;
         }
+
+        #endregion
+
+        #region Row Factories
 
         private static void AddHeading(IList<DetailRowModel> rows, string text)
         {
@@ -304,6 +320,10 @@ namespace SEpedia.UI
             rows.Add(DetailRowModel.Paged(heading, items, major));
         }
 
+        #endregion
+
+        #region Formatting
+
         private static string YesNo(bool value)
         {
             return value ? "Yes" : "No";
@@ -320,5 +340,7 @@ namespace SEpedia.UI
         {
             return value.X.ToString("0.##") + ", " + value.Y.ToString("0.##") + ", " + value.Z.ToString("0.##");
         }
+
+        #endregion
     }
 }

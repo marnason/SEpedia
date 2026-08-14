@@ -5,6 +5,8 @@ namespace SEpedia.UI
 {
     internal sealed class NavigationController
     {
+        #region State and Construction
+
         private readonly DefinitionIndex index;
         private readonly DefinitionList list;
         private readonly DefinitionView view;
@@ -20,6 +22,10 @@ namespace SEpedia.UI
             list.SelectionChanged += OnListSelectionChanged;
             view.LinkClicked += NavigateTo;
         }
+
+        #endregion
+
+        #region Navigation
 
         public void NavigateTo(MyDefinitionId id)
         {
@@ -46,6 +52,10 @@ namespace SEpedia.UI
             }
         }
 
+        #endregion
+
+        #region Lifecycle and Events
+
         public void Close()
         {
             if (closed)
@@ -65,5 +75,7 @@ namespace SEpedia.UI
             else
                 view.Show(entry);
         }
+
+        #endregion
     }
 }

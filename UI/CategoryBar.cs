@@ -9,6 +9,8 @@ namespace SEpedia.UI
 {
     internal sealed class CategoryBar
     {
+        #region State
+
         private sealed class CategoryButton
         {
             public readonly BrowseCategory Category;
@@ -34,6 +36,10 @@ namespace SEpedia.UI
         private int activeRows;
 
         public HudChain Root { get; private set; }
+
+        #endregion
+
+        #region Construction
 
         public CategoryBar(CatalogFilter filter, Action categoryChanged)
         {
@@ -73,6 +79,10 @@ namespace SEpedia.UI
             UpdateSelection();
         }
 
+        #endregion
+
+        #region Responsive Layout
+
         public void UpdateLayout(float availableWidth)
         {
             float requiredWidth = 0f;
@@ -85,6 +95,10 @@ namespace SEpedia.UI
             if (rowCount != activeRows)
                 Reflow(rowCount);
         }
+
+        #endregion
+
+        #region Selection and Buttons
 
         public void UpdateSelection()
         {
@@ -125,6 +139,10 @@ namespace SEpedia.UI
             buttons.Add(new CategoryButton(category, button, Math.Max(62f, name.Length * 8f + 24f)));
         }
 
+        #endregion
+
+        #region Row Distribution
+
         private void Reflow(int rowCount)
         {
             for (int row = 0; row < rows.Length; row++)
@@ -156,5 +174,7 @@ namespace SEpedia.UI
             for (int row = 0; row < rows.Length; row++)
                 rows[row].Visible = row < rowCount;
         }
+
+        #endregion
     }
 }

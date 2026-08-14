@@ -10,6 +10,8 @@ namespace SEpedia.UI
 {
     public sealed class BindingConfigController
     {
+        #region Configuration
+
         private const string ConfigFileName = "SEpediaBindings.xml";
         private const string BindGroupName = "SEpedia";
         private const string ToggleBindName = "ToggleEncyclopedia";
@@ -21,6 +23,10 @@ namespace SEpedia.UI
         private bool closed;
 
         public event Action ToggleRequested;
+
+        #endregion
+
+        #region Construction
 
         public BindingConfigController()
         {
@@ -51,6 +57,10 @@ namespace SEpedia.UI
             savedSignature = GetSignature(bindGroup.GetBindDefinitions());
         }
 
+        #endregion
+
+        #region Persistence
+
         public void PollForChanges()
         {
             if (closed)
@@ -69,43 +79,6 @@ namespace SEpedia.UI
                 BindDefinition[] current = bindGroup.GetBindDefinitions();
                 Save(current, GetSignature(current));
             }
-        }
-
-        public void Close()
-        {
-            Close(true);
-        }
-
-        public void Close(bool save)
-        {
-            if (closed)
-                return;
-
-            if (save)
-                Save();
-
-            try
-            {
-                toggleBind.NewPressed -= OnTogglePressed;
-            }
-            catch (Exception exception)
-            {
-                SEpediaLog.Warning("Could not release the Rich HUD toggle subscription: " + exception.Message);
-            }
-
-            // Rich HUD exposes no removal API for settings pages. Disable the
-            // stale page so a reset cannot leave an interactive orphan behind.
-            rebindPage.Enabled = false;
-
-            ToggleRequested = null;
-            closed = true;
-        }
-
-        private static BindGroupInitializer CreateDefaults()
-        {
-            var defaults = new BindGroupInitializer();
-            defaults.Add(ToggleBindName, RichHudControls.Control, RichHudControls.F1);
-            return defaults;
         }
 
         private void LoadOrUseDefaults(BindDefinition[] defaults)
@@ -153,6 +126,46 @@ namespace SEpedia.UI
             }
         }
 
+        #endregion
+
+        #region Lifecycle
+
+        public void Close(bool save)
+        {
+            if (closed)
+                return;
+
+            if (save)
+                Save();
+
+            try
+            {
+                toggleBind.NewPressed -= OnTogglePressed;
+            }
+            catch (Exception exception)
+            {
+                SEpediaLog.Warning("Could not release the Rich HUD toggle subscription: " + exception.Message);
+            }
+
+            // Rich HUD exposes no removal API for settings pages. Disable the
+            // stale page so a reset cannot leave an interactive orphan behind.
+            rebindPage.Enabled = false;
+
+            ToggleRequested = null;
+            closed = true;
+        }
+
+        #endregion
+
+        #region Bind Definition Helpers
+
+        private static BindGroupInitializer CreateDefaults()
+        {
+            var defaults = new BindGroupInitializer();
+            defaults.Add(ToggleBindName, RichHudControls.Control, RichHudControls.F1);
+            return defaults;
+        }
+
         private void OnTogglePressed(object sender, EventArgs args)
         {
             if (ToggleRequested != null)
@@ -191,6 +204,8 @@ namespace SEpedia.UI
             for (int index = 0; index < controls.Length; index++)
                 target.Append(controls[index]).Append(',');
         }
+
+        #endregion
 
         [XmlRoot("SEpediaBindings")]
         public sealed class BindingConfiguration

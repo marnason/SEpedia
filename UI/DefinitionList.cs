@@ -9,6 +9,10 @@ namespace SEpedia.UI
 {
     internal sealed class DefinitionList : HudElementBase
     {
+        #region State
+
+        private const int ResultLimit = 500;
+
         public event Action<CatalogEntry> SelectionChanged;
         public event Action FilterRequested;
         public event Action ResultsChanged;
@@ -46,6 +50,10 @@ namespace SEpedia.UI
         {
             get { return categoryBar.Root; }
         }
+
+        #endregion
+
+        #region Construction
 
         public DefinitionList(
             DefinitionIndex definitions,
@@ -104,6 +112,10 @@ namespace SEpedia.UI
             Refresh();
         }
 
+        #endregion
+
+        #region Catalog Queries and Rendering
+
         public void SetSearchText(string query)
         {
             filter.SearchText = query ?? string.Empty;
@@ -117,9 +129,9 @@ namespace SEpedia.UI
                 : string.Empty;
 
             filter.NormalizeForCategory();
-            currentResults = catalog.Query(filter, 500);
+            currentResults = catalog.Query(filter, ResultLimit);
             if (filter.ReconcileAvailableFacets(currentResults.Sources, currentResults.BlockTypes))
-                currentResults = catalog.Query(filter, 500);
+                currentResults = catalog.Query(filter, ResultLimit);
             updating = true;
             try
             {
@@ -163,6 +175,10 @@ namespace SEpedia.UI
             Refresh();
         }
 
+        #endregion
+
+        #region Layout and Selection
+
         public void UpdateCategoryLayout(float availableWidth)
         {
             categoryBar.UpdateLayout(availableWidth);
@@ -185,6 +201,10 @@ namespace SEpedia.UI
             return false;
         }
 
+        #endregion
+
+        #region Event Dispatch
+
         private void OnSelectionChanged(object sender, EventArgs args)
         {
             if (!updating && list.Value != null)
@@ -198,5 +218,6 @@ namespace SEpedia.UI
                 handler(entry);
         }
 
+        #endregion
     }
 }

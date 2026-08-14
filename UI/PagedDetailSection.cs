@@ -7,20 +7,10 @@ using VRageMath;
 
 namespace SEpedia.UI
 {
-    internal sealed class DetailItem
-    {
-        public readonly string Text;
-        public readonly MyDefinitionId? LinkId;
-
-        public DetailItem(string text, MyDefinitionId? linkId = null)
-        {
-            Text = text ?? string.Empty;
-            LinkId = linkId;
-        }
-    }
-
     internal sealed class PagedDetailSection
     {
+        #region State
+
         private static readonly IReadOnlyList<DetailItem> EmptyItems = new List<DetailItem>().AsReadOnly();
 
         private readonly Action<MyDefinitionId> linkClicked;
@@ -31,16 +21,18 @@ namespace SEpedia.UI
 
         public readonly HudChain Root;
 
+        #endregion
+
+        #region Construction
+
         public PagedDetailSection(
             Action<MyDefinitionId> linkClicked,
             string headingText,
-            IList<DetailItem> sectionItems,
+            IReadOnlyList<DetailItem> sectionItems,
             bool majorHeading)
         {
             this.linkClicked = linkClicked;
-            items = sectionItems != null
-                ? new List<DetailItem>(sectionItems).AsReadOnly()
-                : EmptyItems;
+            items = sectionItems ?? EmptyItems;
 
             heading = new Label
             {
@@ -83,6 +75,10 @@ namespace SEpedia.UI
             UpdateSlots();
         }
 
+        #endregion
+
+        #region Layout
+
         public void SetWidth(float width)
         {
             Root.Width = width;
@@ -94,6 +90,10 @@ namespace SEpedia.UI
                 slots[index].LineWrapWidth = Math.Max(60f, width - slots[index].Padding.X);
             }
         }
+
+        #endregion
+
+        #region Paging and Interaction
 
         private void Activate(int slotIndex)
         {
@@ -127,7 +127,8 @@ namespace SEpedia.UI
                         : GlyphFormat.White.WithSize(.82f));
                 slot.InputEnabled = linked;
             }
-
         }
+
+        #endregion
     }
 }

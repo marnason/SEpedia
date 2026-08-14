@@ -7,6 +7,8 @@ namespace SEpedia.Core
 {
     internal static class CatalogText
     {
+        #region Labels
+
         public static string GetCategoryName(BrowseCategory category)
         {
             switch (category)
@@ -25,6 +27,10 @@ namespace SEpedia.Core
                 default: return "Entries";
             }
         }
+
+        #endregion
+
+        #region Entry Labels and Runtime Types
 
         public static string GetEntryLabel(CatalogEntry entry)
         {
@@ -73,6 +79,10 @@ namespace SEpedia.Core
             }
             return builder.ToString();
         }
+
+        #endregion
+
+        #region Recipe Text
 
         public static string BuildRecipeSummary(RecipeDocument recipe, DefinitionIndex definitions)
         {
@@ -135,5 +145,7 @@ namespace SEpedia.Core
                 builder.Append(' ').Append(definition.DisplayName).Append(' ').Append(definition.SubtypeName);
             builder.Append(' ').Append(id);
         }
+
+        #endregion
     }
 }

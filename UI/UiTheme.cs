@@ -7,7 +7,6 @@ namespace SEpedia.UI
     internal static class UiTheme
     {
         public const float StandardRowHeight = 27f;
-        public const float HeaderRowHeight = 30f;
         public const float PagerButtonWidth = 42f;
         public const float ControlSpacing = 4f;
         public const int BoundedPageSize = 8;

@@ -6,6 +6,8 @@ namespace SEpedia.UI
 {
     internal sealed class SEpediaFrontend
     {
+        #region State
+
         private BindingConfigController bindings;
         private EncyclopediaWindow window;
         private DefinitionIndex index;
@@ -14,6 +16,10 @@ namespace SEpedia.UI
         private bool survivalMode;
         private bool pendingOpen;
         private bool closed;
+
+        #endregion
+
+        #region Rich HUD Lifecycle
 
         public void InitializeRichHud()
         {
@@ -33,6 +39,27 @@ namespace SEpedia.UI
                 SEpediaLog.Error("Rich HUD interface initialization failed.", exception);
             }
         }
+
+        public void ResetRichHud()
+        {
+            CloseRichHudObjects(false);
+        }
+
+        public void Close()
+        {
+            if (closed)
+                return;
+            closed = true;
+            CloseRichHudObjects(true);
+            index = null;
+            celestial = null;
+            filter = null;
+            pendingOpen = false;
+        }
+
+        #endregion
+
+        #region Backend Updates
 
         public void AttachIndex(DefinitionIndex definitionIndex, CelestialIndex celestialIndex, bool isSurvivalMode)
         {
@@ -62,22 +89,9 @@ namespace SEpedia.UI
                 bindings.Save();
         }
 
-        public void ResetRichHud()
-        {
-            CloseRichHudObjects(false);
-        }
+        #endregion
 
-        public void Close()
-        {
-            if (closed)
-                return;
-            closed = true;
-            CloseRichHudObjects(true);
-            index = null;
-            celestial = null;
-            filter = null;
-            pendingOpen = false;
-        }
+        #region Window Creation and Events
 
         private void TryCreateWindow()
         {
@@ -107,6 +121,10 @@ namespace SEpedia.UI
                 pendingOpen = true;
         }
 
+        #endregion
+
+        #region Cleanup
+
         private void CloseRichHudObjects(bool saveBindings)
         {
             // Release dependants in reverse acquisition order: window first,
@@ -132,5 +150,7 @@ namespace SEpedia.UI
                 bindings = null;
             }
         }
+
+        #endregion
     }
 }

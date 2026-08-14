@@ -7,9 +7,15 @@ namespace SEpedia.UI
 {
     internal sealed class VanillaHudVisibilityController
     {
+        #region Owned HUD State
+
         private int previousHudState;
         private long playerIdentityId;
         private bool hidden;
+
+        #endregion
+
+        #region Visibility Lifecycle
 
         public void Hide()
         {
@@ -56,5 +62,7 @@ namespace SEpedia.UI
                 SEpediaLog.Warning("Could not restore the vanilla HUD state: " + exception.Message);
             }
         }
+
+        #endregion
     }
 }

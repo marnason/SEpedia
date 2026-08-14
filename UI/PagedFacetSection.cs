@@ -8,6 +8,8 @@ namespace SEpedia.UI
 {
     internal sealed class PagedFacetSection
     {
+        #region State
+
         private sealed class Slot
         {
             public readonly NamedCheckBox CheckBox;
@@ -27,7 +29,6 @@ namespace SEpedia.UI
         private readonly string headingText;
         private readonly HashSet<string> selected;
         private readonly bool showKeyToolTips;
-        private readonly Func<bool> isUpdating;
         private readonly Action changed;
         private readonly Label heading;
         private readonly NamedCheckBox all;
@@ -38,20 +39,22 @@ namespace SEpedia.UI
         private readonly ScrollBoxEntry pagerEntry;
         private IReadOnlyList<FacetCount> facets;
 
+        #endregion
+
+        #region Construction
+
         public PagedFacetSection(
             ScrollBox content,
             string headingText,
             string allText,
             HashSet<string> selected,
             bool showKeyToolTips,
-            Func<bool> isUpdating,
             Action changed,
             IList<ScrollBoxEntry> group = null)
         {
             this.headingText = headingText;
             this.selected = selected;
             this.showKeyToolTips = showKeyToolTips;
-            this.isUpdating = isUpdating;
             this.changed = changed;
             facets = EmptyFacets;
 
@@ -61,8 +64,6 @@ namespace SEpedia.UI
             all = CreateCheckBox(allText, true);
             all.MouseInput.LeftClicked += delegate
             {
-                if (isUpdating())
-                    return;
                 if (all.Value)
                 {
                     selected.Clear();
@@ -84,7 +85,7 @@ namespace SEpedia.UI
                 Slot capturedSlot = slot;
                 checkBox.MouseInput.LeftClicked += delegate
                 {
-                    if (isUpdating() || capturedSlot.Facet == null)
+                    if (capturedSlot.Facet == null)
                         return;
                     if (capturedSlot.CheckBox.Value)
                         selected.Add(capturedSlot.Facet.Key);
@@ -97,6 +98,10 @@ namespace SEpedia.UI
             pager = new PagerRow(UpdateVisibleSlots);
             pagerEntry = AddRow(content, pager.Root, group);
         }
+
+        #endregion
+
+        #region Facet Updates
 
         public void Update(IReadOnlyList<FacetCount> newFacets, bool enabled)
         {
@@ -148,6 +153,10 @@ namespace SEpedia.UI
             pagerEntry.Enabled = enabled && pager.Root.Visible;
         }
 
+        #endregion
+
+        #region Control Factories
+
         private static ScrollBoxEntry AddRow(
             ScrollBox content,
             HudElementBase row,
@@ -184,5 +193,7 @@ namespace SEpedia.UI
                 Padding = new VRageMath.Vector2(4f, 4f)
             };
         }
+
+        #endregion
     }
 }

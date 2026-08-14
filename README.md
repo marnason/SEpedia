@@ -25,6 +25,11 @@ The project targets .NET Framework 4.8 and C# 6 through MDK². Machine-local MDK
 ./scripts/deploy.sh
 ```
 
-`verify.sh` performs a headless compile-only build and the script-sandbox guard. `deploy.sh` performs a non-interactive Release package/deploy using the locally configured MDK destination. Do not invoke a bare MDK build in automation because its default behavior may open an interactive window.
+`verify.sh` runs the script-sandbox guard and a Debug build with MDK packaging disabled. `deploy.sh` performs a non-interactive Release package/deploy using the locally configured MDK destination. Do not invoke a bare MDK build in automation because its default behavior may open an interactive window.
+
+## Roadmap
+
+- Improve navigation and larger-result browsing, then optimize heavily modded sessions where profiling justifies it.
+- Harden multiplayer, dedicated-server, localization, compatibility, diagnostics, and Workshop release behavior.
 
 Architecture and runtime ownership are described in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). Third-party provenance is recorded in [THIRD_PARTY.md](THIRD_PARTY.md).

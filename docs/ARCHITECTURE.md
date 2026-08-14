@@ -1,34 +1,25 @@
 # Architecture
 
-## Session lifecycle
+## Runtime ownership
 
-`SEpediaSession` is the only game-discovered entry point. It waits for the Space Engineers definition manager, builds the immutable backend index, and starts spawned-planet tracking. On clients it also waits for Rich HUD Master before creating the frontend. Dedicated servers never create frontend objects.
+`SEpediaSession` is the only game-discovered entry point. It waits for definitions, builds the backend index, and tracks spawned planets. Clients then wait for Rich HUD Master before creating the UI; dedicated servers never create frontend objects.
 
-Registrations are released in reverse ownership order. The window closes text input, restores the vanilla HUD, releases navigation and control subscriptions, then unregisters. The binding controller disables its Rich HUD settings page when Rich HUD offers no removal API. Close and reset paths are idempotent.
+Cleanup runs in reverse ownership order and is idempotent. The window closes text input and restores the vanilla HUD before releasing navigation, controls, settings, and entity subscriptions.
 
-## Definition-build pipeline
+## Definition and catalog flow
 
-1. `DefinitionIndexBuilder` enumerates the primary registry and the separate blueprint registry.
-2. `DefinitionRelationships` discovers build-menu reachability, production-menu reachability, and block variant/pair relationships.
-3. `DefinitionExtractors` converts each game definition into immutable, Rich-HUD-independent domain data.
-4. `DefinitionIndex` sorts and freezes documents, then derives recipe lookup and reverse block usage in explicit passes.
+`DefinitionIndexBuilder` enumerates the primary and blueprint registries. `DefinitionRelationships` derives build-menu, production-menu, variant, and block-pair relationships before `DefinitionExtractors` creates Rich-HUD-independent documents. `DefinitionIndex` then sorts documents and builds the recipe and component-usage lookups.
 
-`DefinitionBuildDiagnostics` isolates failures at game/mod-data boundaries. It labels failures by operation and definition, limits repeated samples, and emits aggregate suppressed counts. Extractors do not mutate relationship indexes as a side effect.
+Failures at game or mod-data boundaries are isolated and summarized by `DefinitionBuildDiagnostics`. Extractors do not mutate relationship indexes.
 
-## Catalog flow
+`CatalogIndex` owns search scoring, the 500-result bound, sorting, and facet counts. `DefinitionList` normalizes category state, reconciles unavailable selections once, and renders the result. Shared labels and recipe search text live in `CatalogText`.
 
-`CatalogIndex` is a read-only searchable projection. `DefinitionList` owns category normalization and unavailable-facet reconciliation, allowing at most one stabilization query. Search scoring, the 500-row display bound, source and block facets, and sorting all live in the catalog layer; labels and recipe summaries live in `CatalogText` so list and detail wording share one source.
+## Detail and layout flow
 
-## Detail and UI ownership
+`DetailPageComposer` produces headings, fields, and bounded sections. `DefinitionView` renders that model and rebuilds rows only when navigation changes. Dynamic detail and facet collections reuse eight live slots plus a shared pager.
 
-`DetailPageComposer` converts a definition or spawned planet into a presentation model containing a header, fields, links, and bounded sections. `DefinitionView` only renders that model and rebuilds rows when navigation changes.
+Nested `HudChain` containers own row-and-column placement. Dynamic controls remain bounded because Rich HUD traverses retained nodes every frame.
 
-Rich HUD layout containers own placement and final sizing. `CategoryBar` reflows existing buttons from their declared minimum widths. `PagedFacetSection` and `PagedDetailSection` share `PagerRow` behavior and reuse eight live slots per dynamic collection.
+## Runtime acceptance
 
-## Bounded-node rule
-
-Runtime-sized Rich HUD data must not create an unbounded compound control tree. Dynamic collections are paged or otherwise bounded; layout complexity must be inspected because Rich HUD traverses retained nodes every frame. Representative heavily modded sessions are the performance acceptance boundary.
-
-## Manual runtime boundary
-
-Compilation and packaging do not prove Rich HUD behavior. Changes affecting UI, input, lifecycle, or runtime indexing must be checked in game for category wrapping, text entry and gameplay-input suppression, vanilla-HUD overlap/restoration, reset/unload behavior, dense relationship paging, heavily modded counts, and sustained FPS/allocation behavior.
+Compilation cannot prove Rich HUD behavior. Relevant changes require in-game checks for category population, search and filters, linked navigation, paging, window resizing, text input and gameplay suppression, vanilla-HUD restoration, Rich HUD reset/unavailability, unload, and heavily modded performance.

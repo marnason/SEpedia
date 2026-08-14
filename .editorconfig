@@ -23,7 +23,3 @@ indent_size = 2
 generated_code = true
 trim_trailing_whitespace = unset
 insert_final_newline = unset
-
-[Content/Data/SEpediaVanillaIconAliases.sbc]
-generated_code = true
-trim_trailing_whitespace = unset
