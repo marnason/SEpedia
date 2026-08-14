@@ -93,6 +93,10 @@ namespace SEpedia.UI
                 SEpediaLog.Warning("Could not release the Rich HUD toggle subscription: " + exception.Message);
             }
 
+            // Rich HUD exposes no removal API for settings pages. Disable the
+            // stale page so a reset cannot leave an interactive orphan behind.
+            rebindPage.Enabled = false;
+
             ToggleRequested = null;
             closed = true;
         }

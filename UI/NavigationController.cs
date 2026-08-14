@@ -3,12 +3,13 @@ using VRage.Game;
 
 namespace SEpedia.UI
 {
-    public sealed class NavigationController
+    internal sealed class NavigationController
     {
         private readonly DefinitionIndex index;
         private readonly DefinitionList list;
         private readonly DefinitionView view;
         private bool navigating;
+        private bool closed;
 
         public NavigationController(DefinitionIndex index, DefinitionList list, DefinitionView view)
         {
@@ -47,6 +48,9 @@ namespace SEpedia.UI
 
         public void Close()
         {
+            if (closed)
+                return;
+            closed = true;
             list.SelectionChanged -= OnListSelectionChanged;
             view.LinkClicked -= NavigateTo;
         }

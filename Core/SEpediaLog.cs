@@ -3,7 +3,7 @@ using VRage.Utils;
 
 namespace SEpedia.Core
 {
-    public static class SEpediaLog
+    internal static class SEpediaLog
     {
         public static void Info(string message)
         {

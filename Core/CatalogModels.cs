@@ -1,67 +1,17 @@
 using System;
 using System.Collections.Generic;
 using VRage.Game;
-using VRageMath;
 
 namespace SEpedia.Core
 {
-    public sealed class PlanetSnapshot
+    internal enum TriStateFilter
     {
-        public long EntityId { get; private set; }
-        public string DisplayName { get; private set; }
-        public Vector3D Position { get; private set; }
-        public float MinimumRadius { get; private set; }
-        public float AverageRadius { get; private set; }
-        public float MaximumRadius { get; private set; }
-        public bool HasAtmosphere { get; private set; }
-        public float AtmosphereRadius { get; private set; }
-        public float AtmosphereAltitude { get; private set; }
-        public MyDefinitionId? GeneratorId { get; private set; }
-        public DefinitionOrigin Origin { get; private set; }
-        public bool Enabled { get; private set; }
-        public bool Public { get; private set; }
-        public bool AvailableInSurvival { get; private set; }
-        public PlanetGeneratorData GeneratorData { get; private set; }
-        public bool HasGeneratorMetadata { get; private set; }
-
-        public PlanetSnapshot(
-            long entityId,
-            string displayName,
-            Vector3D position,
-            float minimumRadius,
-            float averageRadius,
-            float maximumRadius,
-            bool hasAtmosphere,
-            float atmosphereRadius,
-            float atmosphereAltitude,
-            MyDefinitionId? generatorId,
-            DefinitionOrigin origin,
-            bool enabled,
-            bool isPublic,
-            bool availableInSurvival,
-            PlanetGeneratorData generatorData,
-            bool hasGeneratorMetadata)
-        {
-            EntityId = entityId;
-            DisplayName = displayName ?? string.Empty;
-            Position = position;
-            MinimumRadius = minimumRadius;
-            AverageRadius = averageRadius;
-            MaximumRadius = maximumRadius;
-            HasAtmosphere = hasAtmosphere;
-            AtmosphereRadius = atmosphereRadius;
-            AtmosphereAltitude = atmosphereAltitude;
-            GeneratorId = generatorId;
-            Origin = origin ?? DefinitionOrigin.Unknown;
-            Enabled = enabled;
-            Public = isPublic;
-            AvailableInSurvival = availableInSurvival;
-            GeneratorData = generatorData;
-            HasGeneratorMetadata = hasGeneratorMetadata;
-        }
+        Either = 0,
+        Yes = 1,
+        No = 2
     }
 
-    public sealed class CatalogEntry
+    internal sealed class CatalogEntry
     {
         public DefinitionDocument Definition { get; private set; }
         public PlanetSnapshot Planet { get; private set; }
@@ -81,24 +31,26 @@ namespace SEpedia.Core
             get { return Definition != null ? Definition.Origin : Planet.Origin; }
         }
 
-        public bool Enabled
+        public bool IsEnabled
         {
-            get { return Definition != null ? Definition.Enabled : Planet.Enabled; }
+            get { return Definition != null ? Definition.IsEnabled : Planet.IsEnabled; }
         }
 
-        public bool Public
+        public bool IsPublic
         {
-            get { return Definition != null ? Definition.Public : Planet.Public; }
+            get { return Definition != null ? Definition.IsPublic : Planet.IsPublic; }
         }
 
-        public bool AvailableInSurvival
+        public bool IsAvailableInSurvival
         {
             get
             {
                 if (Definition != null && Definition.Recipe != null &&
                     Definition.BrowseCategory == BrowseCategory.Recipes)
-                    return Definition.Recipe.ProductionMenuReachable;
-                return Definition != null ? Definition.AvailableInSurvival : Planet.AvailableInSurvival;
+                    return Definition.Recipe.IsProductionMenuReachable;
+                return Definition != null
+                    ? Definition.IsAvailableInSurvival
+                    : Planet.IsAvailableInSurvival;
             }
         }
 
@@ -123,14 +75,14 @@ namespace SEpedia.Core
         }
     }
 
-    public sealed class CatalogFilter
+    internal sealed class CatalogFilter
     {
         public BrowseCategory Category { get; set; }
         public string SearchText { get; set; }
-        public TriStateFilter Enabled { get; set; }
-        public TriStateFilter Public { get; set; }
-        public TriStateFilter AvailableInSurvival { get; set; }
-        public TriStateFilter ListedInBuildMenu { get; set; }
+        public TriStateFilter EnabledState { get; set; }
+        public TriStateFilter PublicState { get; set; }
+        public TriStateFilter SurvivalState { get; set; }
+        public TriStateFilter BuildMenuState { get; set; }
         public HashSet<string> SelectedSourceKeys { get; private set; }
         public HashSet<MyCubeSize> SelectedGridSizes { get; private set; }
         public HashSet<string> SelectedBlockTypes { get; private set; }
@@ -147,19 +99,59 @@ namespace SEpedia.Core
 
         public void ResetAdvanced(bool survivalMode)
         {
-            Enabled = TriStateFilter.Yes;
-            Public = TriStateFilter.Yes;
-            AvailableInSurvival = survivalMode ? TriStateFilter.Yes : TriStateFilter.Either;
-            ListedInBuildMenu = TriStateFilter.Yes;
+            EnabledState = TriStateFilter.Yes;
+            PublicState = TriStateFilter.Yes;
+            SurvivalState = survivalMode ? TriStateFilter.Yes : TriStateFilter.Either;
+            BuildMenuState = TriStateFilter.Yes;
             SelectedSourceKeys.Clear();
             SelectedGridSizes.Clear();
             SelectedGridSizes.Add(MyCubeSize.Small);
             SelectedGridSizes.Add(MyCubeSize.Large);
             SelectedBlockTypes.Clear();
         }
+
+        public void NormalizeForCategory()
+        {
+            if (Category != BrowseCategory.Blocks)
+            {
+                SelectedBlockTypes.Clear();
+                SelectedGridSizes.Clear();
+                return;
+            }
+
+            if (SelectedGridSizes.Count == 0)
+            {
+                SelectedGridSizes.Add(MyCubeSize.Small);
+                SelectedGridSizes.Add(MyCubeSize.Large);
+            }
+        }
+
+        public bool ReconcileAvailableFacets(
+            IReadOnlyList<FacetCount> sources,
+            IReadOnlyList<FacetCount> blockTypes)
+        {
+            bool changed = RemoveUnavailableSelections(SelectedSourceKeys, sources);
+            changed |= RemoveUnavailableSelections(SelectedBlockTypes, blockTypes);
+            return changed;
+        }
+
+        private static bool RemoveUnavailableSelections(
+            HashSet<string> selected,
+            IReadOnlyList<FacetCount> available)
+        {
+            if (selected.Count == 0)
+                return false;
+
+            var keys = new HashSet<string>(StringComparer.Ordinal);
+            for (int index = 0; index < available.Count; index++)
+                keys.Add(available[index].Key);
+            int originalCount = selected.Count;
+            selected.RemoveWhere(delegate(string key) { return !keys.Contains(key); });
+            return selected.Count != originalCount;
+        }
     }
 
-    public sealed class FacetCount
+    internal sealed class FacetCount
     {
         public string Key { get; private set; }
         public string DisplayName { get; private set; }
@@ -173,7 +165,7 @@ namespace SEpedia.Core
         }
     }
 
-    public sealed class CatalogResult
+    internal sealed class CatalogResult
     {
         public IReadOnlyList<CatalogEntry> Items { get; private set; }
         public int TotalCount { get; private set; }

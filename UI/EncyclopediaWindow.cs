@@ -6,7 +6,7 @@ using VRageMath;
 
 namespace SEpedia.UI
 {
-    public sealed class EncyclopediaWindow : WindowBase
+    internal sealed class EncyclopediaWindow : WindowBase
     {
         private readonly bool survivalMode;
         private readonly CelestialIndex celestial;
@@ -16,6 +16,7 @@ namespace SEpedia.UI
         private readonly DefinitionView definitionView;
         private readonly NavigationController navigation;
         private readonly VanillaHudVisibilityController vanillaHud;
+        private bool closed;
 
         public EncyclopediaWindow(
             DefinitionIndex index,
@@ -89,6 +90,8 @@ namespace SEpedia.UI
 
         public void Toggle()
         {
+            if (closed)
+                return;
             Visible = !Visible;
 
             if (Visible)
@@ -119,11 +122,17 @@ namespace SEpedia.UI
 
         public void Close()
         {
+            if (closed)
+                return;
+            closed = true;
+
+            searchField.CloseInput();
+            Visible = false;
             vanillaHud.Restore();
-            definitionList.FilterRequested -= ToggleFilters;
-            definitionList.ResultsChanged -= RefreshFilterDrawer;
-            filterDrawer.FiltersChanged -= FiltersChanged;
             filterDrawer.ResetRequested -= ResetFilters;
+            filterDrawer.FiltersChanged -= FiltersChanged;
+            definitionList.ResultsChanged -= RefreshFilterDrawer;
+            definitionList.FilterRequested -= ToggleFilters;
             navigation.Close();
             Unregister();
         }

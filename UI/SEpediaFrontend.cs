@@ -4,7 +4,7 @@ using SEpedia.Core;
 
 namespace SEpedia.UI
 {
-    public sealed class SEpediaFrontend
+    internal sealed class SEpediaFrontend
     {
         private BindingConfigController bindings;
         private EncyclopediaWindow window;
@@ -13,9 +13,11 @@ namespace SEpedia.UI
         private CatalogFilter filter;
         private bool survivalMode;
         private bool pendingOpen;
+        private bool closed;
 
         public void InitializeRichHud()
         {
+            closed = false;
             CloseRichHudObjects(false);
 
             try
@@ -67,6 +69,9 @@ namespace SEpedia.UI
 
         public void Close()
         {
+            if (closed)
+                return;
+            closed = true;
             CloseRichHudObjects(true);
             index = null;
             celestial = null;
@@ -104,13 +109,8 @@ namespace SEpedia.UI
 
         private void CloseRichHudObjects(bool saveBindings)
         {
-            if (bindings != null)
-            {
-                bindings.ToggleRequested -= OnToggleRequested;
-                bindings.Close(saveBindings);
-                bindings = null;
-            }
-
+            // Release dependants in reverse acquisition order: window first,
+            // then the binding/settings registration that can open it.
             if (window != null)
             {
                 try
@@ -123,6 +123,13 @@ namespace SEpedia.UI
                 }
 
                 window = null;
+            }
+
+            if (bindings != null)
+            {
+                bindings.ToggleRequested -= OnToggleRequested;
+                bindings.Close(saveBindings);
+                bindings = null;
             }
         }
     }

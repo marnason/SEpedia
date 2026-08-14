@@ -3,7 +3,7 @@ using VRage.Game;
 
 namespace SEpedia.Core
 {
-    public sealed class RecipeIndex
+    internal sealed class RecipeIndex
     {
         private static readonly IReadOnlyList<RecipeDocument> EmptyRecipes = new List<RecipeDocument>().AsReadOnly();
 
@@ -32,7 +32,7 @@ namespace SEpedia.Core
 
                 AddRelations(producing, recipe.Results, recipe);
                 AddRelations(consuming, recipe.Prerequisites, recipe);
-                if (recipe.ProductionMenuReachable)
+                if (recipe.IsProductionMenuReachable)
                 {
                     MenuCount++;
                     AddRelations(menuProducing, recipe.Results, recipe);

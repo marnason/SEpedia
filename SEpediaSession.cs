@@ -107,7 +107,7 @@ namespace SEpedia
             try
             {
                 bool survivalMode = MyAPIGateway.Session != null && !MyAPIGateway.Session.CreativeMode;
-                DefinitionIndex built = DefinitionIndex.Build(manager, survivalMode, SEpediaLog.Warning);
+                DefinitionIndex built = DefinitionIndexBuilder.Build(manager, survivalMode, SEpediaLog.Warning);
                 stopwatch.Stop();
                 definitionIndex = built;
 
@@ -138,10 +138,7 @@ namespace SEpedia
                     stopwatch.ElapsedMilliseconds + " ms.");
                 SEpediaLog.Info(
                     "Icon resolution: " + built.IconStats.RenderableDefinitions + " of " +
-                    built.IconStats.DefinitionsWithIcons + " definitions renderable (" +
-                    built.IconStats.PathAliasDefinitions + " path aliases, " +
-                    built.IconStats.SameOriginDefinitions + " same-origin materials, " +
-                    built.IconStats.MixedDefinitions + " mixed); " +
+                    built.IconStats.DefinitionsWithIcons + " definitions renderable through packaged aliases; " +
                     built.IconStats.UnresolvedDefinitions + " unresolved and " +
                     built.IconStats.LayerLimitDefinitions + " above the layer limit.");
 

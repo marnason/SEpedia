@@ -1,0 +1,29 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.cs]
+indent_style = space
+indent_size = 4
+csharp_new_line_before_open_brace = all
+
+[*.{sh,py}]
+indent_style = space
+indent_size = 4
+
+[*.{md,xml,sbc,csproj,sln}]
+indent_style = space
+indent_size = 2
+
+[RichHudFramework/**]
+generated_code = true
+trim_trailing_whitespace = unset
+insert_final_newline = unset
+
+[Content/Data/SEpediaVanillaIconAliases.sbc]
+generated_code = true
+trim_trailing_whitespace = unset

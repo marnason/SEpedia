@@ -21,18 +21,13 @@ namespace SEpedia.UI
 
     internal sealed class PagedDetailSection
     {
-        private const int PageSize = 8;
         private static readonly IReadOnlyList<DetailItem> EmptyItems = new List<DetailItem>().AsReadOnly();
 
         private readonly Action<MyDefinitionId> linkClicked;
         private readonly Label heading;
         private readonly LabelButton[] slots;
-        private readonly LabelBoxButton previous;
-        private readonly Label pageLabel;
-        private readonly LabelBoxButton next;
-        private readonly HudChain pager;
+        private readonly PagerRow pager;
         private readonly IReadOnlyList<DetailItem> items;
-        private int page;
 
         public readonly HudChain Root;
 
@@ -65,7 +60,7 @@ namespace SEpedia.UI
             };
             Root.Add(heading);
 
-            slots = new LabelButton[PageSize];
+            slots = new LabelButton[UiTheme.BoundedPageSize];
             for (int index = 0; index < slots.Length; index++)
             {
                 var slot = new LabelButton
@@ -82,54 +77,17 @@ namespace SEpedia.UI
                 Root.Add(slot);
             }
 
-            previous = CreatePagerButton("<", "Previous page");
-            pageLabel = new Label
-            {
-                Height = 27f,
-                AutoResize = false,
-                VertCenterText = true
-            };
-            next = CreatePagerButton(">", "Next page");
-            previous.MouseInput.LeftClicked += delegate
-            {
-                if (page > 0)
-                {
-                    page--;
-                    UpdateSlots();
-                }
-            };
-            next.MouseInput.LeftClicked += delegate
-            {
-                if (page < PageCount - 1)
-                {
-                    page++;
-                    UpdateSlots();
-                }
-            };
-
-            pager = new HudChain(false)
-            {
-                Height = 27f,
-                SizingMode = HudChainSizingModes.FitMembersOffAxis,
-                Spacing = 4f
-            };
-            pager.Add(previous);
-            pager.Add(pageLabel, 1f);
-            pager.Add(next);
-            Root.Add(pager);
+            pager = new PagerRow(UpdateSlots);
+            pager.Configure(items.Count, UiTheme.BoundedPageSize);
+            Root.Add(pager.Root);
             UpdateSlots();
-        }
-
-        private int PageCount
-        {
-            get { return Math.Max(1, (items.Count + PageSize - 1) / PageSize); }
         }
 
         public void SetWidth(float width)
         {
             Root.Width = width;
             heading.Width = width;
-            pager.Width = width;
+            pager.Root.Width = width;
             for (int index = 0; index < slots.Length; index++)
             {
                 slots[index].Width = width;
@@ -139,7 +97,7 @@ namespace SEpedia.UI
 
         private void Activate(int slotIndex)
         {
-            int itemIndex = page * PageSize + slotIndex;
+            int itemIndex = pager.Page * UiTheme.BoundedPageSize + slotIndex;
             if (itemIndex >= items.Count || !items[itemIndex].LinkId.HasValue || linkClicked == null)
                 return;
             linkClicked(items[itemIndex].LinkId.Value);
@@ -147,8 +105,7 @@ namespace SEpedia.UI
 
         private void UpdateSlots()
         {
-            page = Math.Max(0, Math.Min(page, PageCount - 1));
-            int start = page * PageSize;
+            int start = pager.Page * UiTheme.BoundedPageSize;
             for (int index = 0; index < slots.Length; index++)
             {
                 int itemIndex = start + index;
@@ -171,31 +128,6 @@ namespace SEpedia.UI
                 slot.InputEnabled = linked;
             }
 
-            pager.Visible = PageCount > 1;
-            pageLabel.Text = new RichText(
-                (page + 1) + " / " + PageCount,
-                GlyphFormat.Blueish.WithAlignment(TextAlignment.Center).WithSize(.72f));
-            previous.InputEnabled = page > 0;
-            next.InputEnabled = page < PageCount - 1;
-            previous.Color = previous.InputEnabled ? new Color(36, 47, 55) : new Color(28, 35, 40);
-            next.Color = next.InputEnabled ? new Color(36, 47, 55) : new Color(28, 35, 40);
-        }
-
-        private static LabelBoxButton CreatePagerButton(string text, string toolTip)
-        {
-            var button = new LabelBoxButton
-            {
-                Text = new RichText(text, GlyphFormat.White.WithAlignment(TextAlignment.Center).WithSize(.8f)),
-                Height = 27f,
-                Width = 42f,
-                AutoResize = false,
-                VertCenterText = true,
-                TextPadding = Vector2.Zero,
-                Color = new Color(36, 47, 55),
-                HighlightColor = new Color(67, 82, 92)
-            };
-            button.MouseInput.ToolTip = toolTip;
-            return button;
         }
     }
 }

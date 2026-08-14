@@ -9,69 +9,61 @@ namespace SEpedia.Core
     {
         public const int LayerLimit = 8;
 
-        private readonly Dictionary<string, string> materialsByContextAndPath;
-        private readonly HashSet<string> registeredMaterialIds;
+        private readonly HashSet<string> packagedAliases;
         private int definitionsWithIcons;
         private int renderableDefinitions;
-        private int pathAliasDefinitions;
-        private int sameOriginDefinitions;
-        private int mixedDefinitions;
         private int unresolvedDefinitions;
         private int layerLimitDefinitions;
 
-        public DefinitionIconResolver(MyDefinitionManager manager, Action<string> logWarning)
+        public DefinitionIconResolver(
+            MyDefinitionManager manager,
+            DefinitionBuildDiagnostics diagnostics)
         {
-            materialsByContextAndPath = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            registeredMaterialIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            IndexMaterials(manager, logWarning);
+            packagedAliases = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            IndexPackagedAliases(manager, diagnostics);
         }
 
         public DefinitionIconData Resolve(MyDefinitionBase definition, IList<string> texturePaths)
         {
             if (texturePaths == null || texturePaths.Count == 0)
-                return new DefinitionIconData(new List<string>(), new List<string>());
+                return new DefinitionIconData(
+                    new List<string>(),
+                    new List<string>(),
+                    IconResolutionKind.None);
 
             definitionsWithIcons++;
             if (texturePaths.Count > LayerLimit)
             {
                 layerLimitDefinitions++;
-                return new DefinitionIconData(texturePaths, new List<string>());
+                return new DefinitionIconData(
+                    texturePaths,
+                    new List<string>(),
+                    IconResolutionKind.LayerLimit);
             }
 
             var materialIds = new List<string>(texturePaths.Count);
-            bool usedSameOrigin = false;
-            bool usedPathAlias = false;
             for (int index = 0; index < texturePaths.Count; index++)
             {
                 string normalizedPath = NormalizeTexturePath(definition.Context, texturePaths[index]);
-                string materialId;
-                if (materialsByContextAndPath.TryGetValue(
-                    GetContextKey(definition.Context) + "|" + normalizedPath,
-                    out materialId))
-                {
-                    materialIds.Add(materialId);
-                    usedSameOrigin = true;
-                }
-                else if (registeredMaterialIds.Contains(normalizedPath))
+                if (packagedAliases.Contains(normalizedPath))
                 {
                     materialIds.Add(normalizedPath);
-                    usedPathAlias = true;
                 }
                 else
                 {
                     unresolvedDefinitions++;
-                    return new DefinitionIconData(texturePaths, new List<string>());
+                    return new DefinitionIconData(
+                        texturePaths,
+                        new List<string>(),
+                        IconResolutionKind.Unresolved);
                 }
             }
 
             renderableDefinitions++;
-            if (usedSameOrigin && usedPathAlias)
-                mixedDefinitions++;
-            else if (usedSameOrigin)
-                sameOriginDefinitions++;
-            else
-                pathAliasDefinitions++;
-            return new DefinitionIconData(texturePaths, materialIds);
+            return new DefinitionIconData(
+                texturePaths,
+                materialIds,
+                IconResolutionKind.PackagedAlias);
         }
 
         public DefinitionIconStats GetStats()
@@ -79,14 +71,13 @@ namespace SEpedia.Core
             return new DefinitionIconStats(
                 definitionsWithIcons,
                 renderableDefinitions,
-                pathAliasDefinitions,
-                sameOriginDefinitions,
-                mixedDefinitions,
                 unresolvedDefinitions,
                 layerLimitDefinitions);
         }
 
-        private void IndexMaterials(MyDefinitionManager manager, Action<string> logWarning)
+        private void IndexPackagedAliases(
+            MyDefinitionManager manager,
+            DefinitionBuildDiagnostics diagnostics)
         {
             try
             {
@@ -95,21 +86,22 @@ namespace SEpedia.Core
                     if (material == null || string.IsNullOrWhiteSpace(material.Id.SubtypeName))
                         continue;
 
-                    string materialId = material.Id.SubtypeName.Trim();
-                    registeredMaterialIds.Add(materialId);
                     if (string.IsNullOrWhiteSpace(material.Texture))
                         continue;
 
-                    string key = GetContextKey(material.Context) + "|" +
-                        NormalizeTexturePath(material.Context, material.Texture);
-                    if (!materialsByContextAndPath.ContainsKey(key))
-                        materialsByContextAndPath.Add(key, materialId);
+                    string materialId = NormalizePath(material.Id.SubtypeName);
+                    string texturePath = NormalizeTexturePath(material.Context, material.Texture);
+                    if (materialId.StartsWith("Textures\\GUI\\Icons\\", StringComparison.OrdinalIgnoreCase) &&
+                        string.Equals(materialId, texturePath, StringComparison.OrdinalIgnoreCase))
+                        packagedAliases.Add(materialId);
                 }
             }
             catch (Exception exception)
             {
-                if (logWarning != null)
-                    logWarning("Could not index registered icon materials: " + exception.Message);
+                diagnostics.Report(
+                    "icon-alias-registry",
+                    "Could not index packaged icon aliases",
+                    exception);
             }
         }
 
@@ -120,21 +112,6 @@ namespace SEpedia.Core
             if (contextPath.Length > 0 && normalized.StartsWith(contextPath + "\\", StringComparison.OrdinalIgnoreCase))
                 normalized = normalized.Substring(contextPath.Length + 1);
             return normalized.TrimStart('\\');
-        }
-
-        private static string GetContextKey(MyModContext context)
-        {
-            if (context == null)
-                return "unknown";
-            if (context.IsBaseGame)
-                return "base-game";
-            if (!string.IsNullOrWhiteSpace(context.ModId))
-                return "published:" + (context.ModServiceName ?? string.Empty) + ":" + context.ModId;
-            if (!string.IsNullOrWhiteSpace(context.ModPath))
-                return "local-path:" + NormalizePath(context.ModPath).TrimEnd('\\');
-            if (!string.IsNullOrWhiteSpace(context.ModName))
-                return "local-name:" + context.ModName;
-            return "unknown";
         }
 
         private static string NormalizePath(string path)

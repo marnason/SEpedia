@@ -6,7 +6,7 @@ using VRage.ModAPI;
 
 namespace SEpedia.Core
 {
-    public sealed class CelestialIndex
+    internal sealed class CelestialIndex
     {
         public event Action Changed;
 
@@ -101,9 +101,9 @@ namespace SEpedia.Core
                     planet.AtmosphereAltitude,
                     planet.Generator != null ? (VRage.Game.MyDefinitionId?)planet.Generator.Id : null,
                     generatorDocument != null ? generatorDocument.Origin : DefinitionOrigin.Unknown,
-                    generatorDocument == null || generatorDocument.Enabled,
-                    generatorDocument == null || generatorDocument.Public,
-                    generatorDocument == null || generatorDocument.AvailableInSurvival,
+                    generatorDocument == null || generatorDocument.IsEnabled,
+                    generatorDocument == null || generatorDocument.IsPublic,
+                    generatorDocument == null || generatorDocument.IsAvailableInSurvival,
                     generatorDocument != null ? generatorDocument.PlanetGenerator : null,
                     generatorDocument != null);
 

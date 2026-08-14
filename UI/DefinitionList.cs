@@ -7,38 +7,20 @@ using VRageMath;
 
 namespace SEpedia.UI
 {
-    public sealed class DefinitionList : HudElementBase
+    internal sealed class DefinitionList : HudElementBase
     {
-        private sealed class CategoryButton
-        {
-            public readonly BrowseCategory Category;
-            public readonly LabelBoxButton Button;
-            public readonly float WidthWeight;
-
-            public CategoryButton(BrowseCategory category, LabelBoxButton button, float widthWeight)
-            {
-                Category = category;
-                Button = button;
-                WidthWeight = widthWeight;
-            }
-        }
-
         public event Action<CatalogEntry> SelectionChanged;
         public event Action FilterRequested;
         public event Action ResultsChanged;
 
         private readonly DefinitionIndex definitions;
         private readonly CatalogFilter filter;
-        private readonly List<CategoryButton> categoryButtons;
-        private readonly HudChain categoryPanel;
-        private readonly HudChain categoryRowOne;
-        private readonly HudChain categoryRowTwo;
+        private readonly CategoryBar categoryBar;
         private readonly ListBox<CatalogEntry> list;
         private readonly Label status;
         private CatalogIndex catalog;
         private CatalogResult currentResults;
         private bool updating;
-        private bool compactCategories;
 
         public CatalogEntry First
         {
@@ -62,7 +44,7 @@ namespace SEpedia.UI
 
         public HudElementBase CategoryBar
         {
-            get { return categoryPanel; }
+            get { return categoryBar.Root; }
         }
 
         public DefinitionList(
@@ -74,30 +56,7 @@ namespace SEpedia.UI
             this.definitions = definitions;
             this.filter = filter;
             catalog = new CatalogIndex(definitions, planets);
-            categoryButtons = new List<CategoryButton>();
-
-            categoryPanel = new HudChain(true)
-            {
-                SizingMode = HudChainSizingModes.FitChainAlignAxis | HudChainSizingModes.FitMembersOffAxis,
-                Spacing = 2f
-            };
-            categoryRowOne = CreateCategoryRow();
-            categoryRowTwo = CreateCategoryRow();
-            categoryPanel.Add(categoryRowOne);
-            categoryPanel.Add(categoryRowTwo);
-            AddCategoryButton(BrowseCategory.Components, 1.25f);
-            AddCategoryButton(BrowseCategory.Ores, .65f);
-            AddCategoryButton(BrowseCategory.Ingots, .75f);
-            AddCategoryButton(BrowseCategory.Ammo, .7f);
-            AddCategoryButton(BrowseCategory.ToolsAndWeapons, 1.65f);
-            AddCategoryButton(BrowseCategory.Consumables, 1.3f);
-            AddCategoryButton(BrowseCategory.GasBottles, 1.15f);
-            AddCategoryButton(BrowseCategory.Items, .65f);
-            AddCategoryButton(BrowseCategory.Blocks, .75f);
-            AddCategoryButton(BrowseCategory.Recipes, .85f);
-            AddCategoryButton(BrowseCategory.Celestial, .95f);
-            RebuildCategoryRows(false);
-            UpdateCategoryButtons();
+            categoryBar = new CategoryBar(filter, Refresh);
 
             var filterButton = new LabelBoxButton
             {
@@ -106,8 +65,8 @@ namespace SEpedia.UI
                 AutoResize = false,
                 VertCenterText = true,
                 TextPadding = Vector2.Zero,
-                Color = new Color(36, 47, 55),
-                HighlightColor = new Color(67, 82, 92)
+                Color = UiTheme.Panel,
+                HighlightColor = UiTheme.PanelHighlight
             };
             filterButton.MouseInput.LeftClicked += delegate
             {
@@ -157,7 +116,10 @@ namespace SEpedia.UI
                 ? list.Value.AssocMember.StableKey
                 : string.Empty;
 
+            filter.NormalizeForCategory();
             currentResults = catalog.Query(filter, 500);
+            if (filter.ReconcileAvailableFacets(currentResults.Sources, currentResults.BlockTypes))
+                currentResults = catalog.Query(filter, 500);
             updating = true;
             try
             {
@@ -168,7 +130,7 @@ namespace SEpedia.UI
                     CatalogEntry entry = currentResults.Items[itemIndex];
                     var text = new RichText();
                     text.Add(entry.DisplayName, GlyphFormat.White.WithSize(.83f));
-                    text.Add("  " + GetEntryLabel(entry), GlyphFormat.Blueish.WithSize(.65f));
+                    text.Add("  " + CatalogText.GetEntryLabel(entry), GlyphFormat.Blueish.WithSize(.65f));
                     list.Add(text, entry);
                     if (entry.StableKey == previousKey)
                         selectedIndex = itemIndex;
@@ -182,7 +144,7 @@ namespace SEpedia.UI
                 updating = false;
             }
 
-            string categoryName = CatalogIndex.GetCategoryName(filter.Category).ToLowerInvariant();
+            string categoryName = CatalogText.GetCategoryName(filter.Category).ToLowerInvariant();
             status.Text = currentResults.TotalCount > currentResults.Items.Count
                 ? "Showing " + currentResults.Items.Count + " of " + currentResults.TotalCount + " " + categoryName
                 : currentResults.TotalCount + " " + categoryName;
@@ -203,9 +165,7 @@ namespace SEpedia.UI
 
         public void UpdateCategoryLayout(float availableWidth)
         {
-            bool compact = availableWidth < 1050f;
-            if (compact != compactCategories)
-                RebuildCategoryRows(compact);
+            categoryBar.UpdateLayout(availableWidth);
         }
 
         public bool TrySelect(DefinitionDocument definition)
@@ -225,81 +185,6 @@ namespace SEpedia.UI
             return false;
         }
 
-        private void AddCategoryButton(BrowseCategory category, float widthWeight)
-        {
-            LabelBoxButton button = CreateCategoryButton(category);
-            categoryButtons.Add(new CategoryButton(category, button, widthWeight));
-        }
-
-        private static HudChain CreateCategoryRow()
-        {
-            return new HudChain(false)
-            {
-                Height = 29f,
-                SizingMode = HudChainSizingModes.FitMembersOffAxis,
-                Spacing = 2f
-            };
-        }
-
-        private void RebuildCategoryRows(bool compact)
-        {
-            categoryRowOne.Clear();
-            categoryRowTwo.Clear();
-            compactCategories = compact;
-
-            int split = compact ? (categoryButtons.Count + 1) / 2 : categoryButtons.Count;
-            for (int index = 0; index < categoryButtons.Count; index++)
-            {
-                CategoryButton category = categoryButtons[index];
-                HudChain row = index < split ? categoryRowOne : categoryRowTwo;
-                row.Add(category.Button, category.WidthWeight);
-            }
-
-            categoryRowTwo.Visible = compact;
-        }
-
-        private LabelBoxButton CreateCategoryButton(BrowseCategory category)
-        {
-            var button = new LabelBoxButton
-            {
-                Text = new RichText(
-                    CatalogIndex.GetCategoryName(category),
-                    GlyphFormat.White.WithAlignment(TextAlignment.Center).WithSize(.68f)),
-                Height = 29f,
-                AutoResize = false,
-                VertCenterText = true,
-                TextPadding = new Vector2(4f, 0f),
-                Color = new Color(36, 47, 55),
-                HighlightColor = new Color(67, 82, 92)
-            };
-            button.MouseInput.LeftClicked += delegate
-            {
-                if (filter.Category == category)
-                    return;
-
-                filter.Category = category;
-                UpdateCategoryButtons();
-                Refresh();
-            };
-            return button;
-        }
-
-        private void UpdateCategoryButtons()
-        {
-            for (int index = 0; index < categoryButtons.Count; index++)
-            {
-                CategoryButton categoryButton = categoryButtons[index];
-                bool selected = categoryButton.Category == filter.Category;
-                categoryButton.Button.Color = selected
-                    ? new Color(142, 188, 206)
-                    : new Color(36, 47, 55);
-                categoryButton.Button.Format = selected
-                    ? GlyphFormat.White.WithColor(new Color(39, 49, 55)).WithAlignment(TextAlignment.Center).WithSize(.68f)
-                    : GlyphFormat.White.WithAlignment(TextAlignment.Center).WithSize(.68f);
-                categoryButton.Button.HighlightEnabled = !selected;
-            }
-        }
-
         private void OnSelectionChanged(object sender, EventArgs args)
         {
             if (!updating && list.Value != null)
@@ -313,29 +198,5 @@ namespace SEpedia.UI
                 handler(entry);
         }
 
-        private static string GetEntryLabel(CatalogEntry entry)
-        {
-            if (entry.IsSpawnedPlanet)
-                return "Spawned planet";
-            if (entry.Definition.AsteroidGenerator != null)
-                return "Asteroid generator";
-            if (entry.Definition.PlanetGenerator != null)
-                return "Planet definition";
-            if (entry.Category == BrowseCategory.Recipes)
-                return string.IsNullOrWhiteSpace(entry.ListDetail) ? "Recipe" : entry.ListDetail;
-            switch (entry.Category)
-            {
-                case BrowseCategory.Components: return "Component";
-                case BrowseCategory.Ores: return "Ore";
-                case BrowseCategory.Ingots: return "Ingot";
-                case BrowseCategory.Ammo: return "Ammo";
-                case BrowseCategory.ToolsAndWeapons: return "Tool / weapon";
-                case BrowseCategory.Consumables: return "Consumable";
-                case BrowseCategory.GasBottles: return "Gas bottle";
-                case BrowseCategory.Items: return "Item";
-                case BrowseCategory.Blocks: return "Block";
-                default: return "Entry";
-            }
-        }
     }
 }
