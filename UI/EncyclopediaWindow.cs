@@ -134,6 +134,7 @@ namespace SEpedia.UI
             SetWidthIfChanged(searchField, Math.Min(360f, Math.Max(220f, Width * .32f)));
             SetWidthIfChanged(definitionList, Math.Min(350f, Math.Max(275f, body.Width * .28f)));
             SetWidthIfChanged(filterDrawer, Math.Min(320f, Math.Max(250f, body.Width * .25f)));
+            definitionList.UpdateCategoryLayout(body.Width);
         }
 
         private void SearchChanged(object sender, EventArgs args)

@@ -18,6 +18,7 @@ namespace SEpedia.Core
         public int SourceCount { get; private set; }
         public int SkippedCount { get; private set; }
         public int IssueCount { get; private set; }
+        public DefinitionIconStats IconStats { get; private set; }
 
         private DefinitionIndex(
             IList<DefinitionDocument> definitions,
@@ -25,7 +26,8 @@ namespace SEpedia.Core
             IDictionary<MyDefinitionId, List<BlockUsage>> mutableBlockUsage,
             int sourceCount,
             int skippedCount,
-            int issueCount)
+            int issueCount,
+            DefinitionIconStats iconStats)
         {
             var sorted = new List<DefinitionDocument>(definitions);
             sorted.Sort(CompareDefinitions);
@@ -43,6 +45,7 @@ namespace SEpedia.Core
             SourceCount = sourceCount;
             SkippedCount = skippedCount;
             IssueCount = issueCount;
+            IconStats = iconStats;
         }
 
         public static DefinitionIndex Build(MyDefinitionManager manager, bool survivalMode, Action<string> logWarning)
@@ -51,8 +54,27 @@ namespace SEpedia.Core
                 throw new ArgumentNullException("manager");
 
             var sourceDefinitions = new List<MyDefinitionBase>(manager.GetAllDefinitions());
+            var sourceDefinitionIds = new HashSet<MyDefinitionId>();
+            for (int definitionIndex = 0; definitionIndex < sourceDefinitions.Count; definitionIndex++)
+            {
+                MyDefinitionBase definition = sourceDefinitions[definitionIndex];
+                if (definition != null)
+                    sourceDefinitionIds.Add(definition.Id);
+            }
+
+            // Blueprint definitions live in their own registry and are not returned by
+            // GetAllDefinitions(). Merge them before building documents and relations.
+            foreach (MyBlueprintDefinitionBase blueprint in manager.GetBlueprintDefinitions())
+            {
+                if (blueprint != null && sourceDefinitionIds.Add(blueprint.Id))
+                    sourceDefinitions.Add(blueprint);
+            }
+
             HashSet<MyDefinitionId> buildMenuReachable = BuildMenuReachability(manager, sourceDefinitions, survivalMode, logWarning);
+            Dictionary<MyDefinitionId, List<MyDefinitionId>> productionMenuReachability =
+                BuildProductionMenuReachability(sourceDefinitions, survivalMode, logWarning);
             Dictionary<MyDefinitionId, List<MyDefinitionId>> blockRelationships = BuildBlockRelationships(manager, logWarning);
+            var iconResolver = new DefinitionIconResolver(manager, logWarning);
             var documents = new List<DefinitionDocument>();
             var recipes = new List<RecipeDocument>();
             var blockUsage = new Dictionary<MyDefinitionId, List<BlockUsage>>();
@@ -107,9 +129,16 @@ namespace SEpedia.Core
                     if (blueprintDefinition != null)
                     {
                         categories |= DefinitionCategory.Blueprint;
-                        recipeData = ExtractRecipe(blueprintDefinition, ref issueCount, logWarning);
+                        List<MyDefinitionId> productionBlocks;
+                        if (!productionMenuReachability.TryGetValue(blueprintDefinition.Id, out productionBlocks))
+                            productionBlocks = new List<MyDefinitionId>();
+                        recipeData = ExtractRecipe(blueprintDefinition, productionBlocks, ref issueCount, logWarning);
                         if (recipeData != null)
+                        {
                             recipes.Add(recipeData);
+                            if (recipeData.ProductionMenuReachable)
+                                browseCategory = BrowseCategory.Recipes;
+                        }
                     }
 
                     MyCubeBlockDefinition blockDefinition = definition as MyCubeBlockDefinition;
@@ -140,11 +169,13 @@ namespace SEpedia.Core
                         asteroidGeneratorData = ExtractAsteroidGenerator(asteroidGenerator, ref issueCount, logWarning);
                     }
 
+                    List<string> icons = GetIcons(definition);
                     documents.Add(new DefinitionDocument(
                         id,
                         GetDisplayName(definition, id),
                         GetDescription(definition),
                         definition.GetType().FullName ?? definition.GetType().Name,
+                        iconResolver.Resolve(definition, icons),
                         categories,
                         browseCategory,
                         GetOrigin(definition, ref issueCount, logWarning),
@@ -165,7 +196,68 @@ namespace SEpedia.Core
                 }
             }
 
-            return new DefinitionIndex(documents, recipes, blockUsage, sourceCount, skippedCount, issueCount);
+            return new DefinitionIndex(
+                documents,
+                recipes,
+                blockUsage,
+                sourceCount,
+                skippedCount,
+                issueCount,
+                iconResolver.GetStats());
+        }
+
+        private static Dictionary<MyDefinitionId, List<MyDefinitionId>> BuildProductionMenuReachability(
+            IList<MyDefinitionBase> definitions,
+            bool survivalMode,
+            Action<string> logWarning)
+        {
+            var reachable = new Dictionary<MyDefinitionId, List<MyDefinitionId>>();
+
+            for (int definitionIndex = 0; definitionIndex < definitions.Count; definitionIndex++)
+            {
+                MyProductionBlockDefinition block = definitions[definitionIndex] as MyProductionBlockDefinition;
+                if (block == null)
+                    continue;
+
+                try
+                {
+                    if (!block.Enabled || !block.Public || (survivalMode && !block.AvailableInSurvival) ||
+                        block.BlueprintClasses == null)
+                        continue;
+
+                    for (int classIndex = 0; classIndex < block.BlueprintClasses.Count; classIndex++)
+                    {
+                        MyBlueprintClassDefinition blueprintClass = block.BlueprintClasses[classIndex];
+                        if (blueprintClass == null)
+                            continue;
+
+                        foreach (MyBlueprintDefinitionBase blueprint in blueprintClass)
+                        {
+                            // BlueprintClasses is the production block's postprocessed menu list.
+                            // The vanilla production screen applies Public here, not the generic
+                            // AvailableInSurvival flag inherited by every definition type.
+                            if (blueprint == null || !blueprint.Public)
+                                continue;
+
+                            List<MyDefinitionId> blocks;
+                            if (!reachable.TryGetValue(blueprint.Id, out blocks))
+                            {
+                                blocks = new List<MyDefinitionId>();
+                                reachable.Add(blueprint.Id, blocks);
+                            }
+
+                            if (!blocks.Contains(block.Id))
+                                blocks.Add(block.Id);
+                        }
+                    }
+                }
+                catch (Exception exception)
+                {
+                    Warn(logWarning, "Could not read production-menu recipes for " + block.Id + ": " + exception.Message);
+                }
+            }
+
+            return reachable;
         }
 
         private static HashSet<MyDefinitionId> BuildMenuReachability(
@@ -412,6 +504,7 @@ namespace SEpedia.Core
 
         private static RecipeDocument ExtractRecipe(
             MyBlueprintDefinitionBase definition,
+            IList<MyDefinitionId> productionBlocks,
             ref int issueCount,
             Action<string> logWarning)
         {
@@ -435,7 +528,8 @@ namespace SEpedia.Core
                     definition.BaseProductionTimeInSeconds,
                     definition.Atomic,
                     prerequisites,
-                    results);
+                    results,
+                    productionBlocks);
             }
             catch (Exception exception)
             {
@@ -715,6 +809,26 @@ namespace SEpedia.Core
                     return string.Empty;
                 }
             }
+        }
+
+        private static List<string> GetIcons(MyDefinitionBase definition)
+        {
+            var icons = new List<string>();
+            try
+            {
+                if (definition.Icons == null)
+                    return icons;
+
+                for (int index = 0; index < definition.Icons.Length; index++)
+                {
+                    string icon = definition.Icons[index];
+                    if (!string.IsNullOrWhiteSpace(icon))
+                        icons.Add(icon);
+                }
+            }
+            catch
+            { }
+            return icons;
         }
 
         private static int CompareDefinitions(DefinitionDocument left, DefinitionDocument right)

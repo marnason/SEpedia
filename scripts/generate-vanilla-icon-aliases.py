@@ -1,0 +1,90 @@
+#!/usr/bin/env python3
+"""Generate Rich HUD aliases for every base-game GUI icon texture."""
+
+from __future__ import print_function
+
+import argparse
+import io
+import os
+import xml.etree.ElementTree as ET
+
+
+def normalize(path):
+    return path.strip().replace("/", "\\")
+
+
+def collect_icons(content_root):
+    icon_root = os.path.join(content_root, "Textures", "GUI", "Icons")
+    if not os.path.isdir(icon_root):
+        raise SystemExit("Base-game GUI icon directory was not found: {0}".format(icon_root))
+
+    icons = {}
+    for directory, _, files in os.walk(icon_root):
+        for filename in files:
+            if not filename.lower().endswith((".dds", ".png")):
+                continue
+            source_path = os.path.join(directory, filename)
+            icon = normalize(os.path.relpath(source_path, content_root))
+            lowered = icon.lower()
+            existing = icons.get(lowered)
+            if existing is not None and existing != icon:
+                raise SystemExit("Case-insensitive duplicate GUI icon path: {0} / {1}".format(existing, icon))
+            icons[lowered] = icon
+    return sorted(icons.values(), key=lambda value: value.lower())
+
+
+def build_aliases(icons):
+    definitions = ET.Element(
+        "Definitions",
+        {
+            "xmlns:xsi": "http://www.w3.org/2001/XMLSchema-instance",
+            "xmlns:xsd": "http://www.w3.org/2001/XMLSchema",
+        },
+    )
+    materials = ET.SubElement(definitions, "TransparentMaterials")
+    for icon in icons:
+        material = ET.SubElement(materials, "TransparentMaterial")
+        identifier = ET.SubElement(material, "Id")
+        ET.SubElement(identifier, "TypeId").text = "TransparentMaterialDefinition"
+        ET.SubElement(identifier, "SubtypeId").text = icon
+        ET.SubElement(material, "AlphaMistingEnable").text = "false"
+        ET.SubElement(material, "CanBeAffectedByOtherLights").text = "false"
+        ET.SubElement(material, "SoftParticleDistanceScale").text = "0"
+        ET.SubElement(material, "Texture").text = icon
+        ET.SubElement(material, "Reflectivity").text = "0"
+
+    ET.indent(definitions, space="  ")
+    output = io.BytesIO()
+    ET.ElementTree(definitions).write(output, encoding="utf-8", xml_declaration=True)
+    return output.getvalue()
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("content_root", help="Space Engineers Content directory")
+    parser.add_argument("output", help="Generated .sbc output path")
+    parser.add_argument("--check", action="store_true", help="Fail if the existing output is stale")
+    arguments = parser.parse_args()
+
+    icons = collect_icons(os.path.abspath(arguments.content_root))
+    if not icons:
+        raise SystemExit("No base-game GUI icon textures were found.")
+
+    output_path = os.path.abspath(arguments.output)
+    generated = build_aliases(icons)
+    if arguments.check:
+        try:
+            with open(output_path, "rb") as existing_file:
+                existing = existing_file.read()
+        except OSError:
+            raise SystemExit("Generated alias file is missing: {0}".format(output_path))
+        if existing != generated:
+            raise SystemExit("Generated alias file is stale: {0}".format(output_path))
+    else:
+        with open(output_path, "wb") as output_file:
+            output_file.write(generated)
+    print("Generated {0} vanilla icon aliases.".format(len(icons)))
+
+
+if __name__ == "__main__":
+    main()

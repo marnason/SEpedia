@@ -13,11 +13,13 @@ namespace SEpedia.UI
         {
             public readonly BrowseCategory Category;
             public readonly LabelBoxButton Button;
+            public readonly float WidthWeight;
 
-            public CategoryButton(BrowseCategory category, LabelBoxButton button)
+            public CategoryButton(BrowseCategory category, LabelBoxButton button, float widthWeight)
             {
                 Category = category;
                 Button = button;
+                WidthWeight = widthWeight;
             }
         }
 
@@ -29,11 +31,14 @@ namespace SEpedia.UI
         private readonly CatalogFilter filter;
         private readonly List<CategoryButton> categoryButtons;
         private readonly HudChain categoryPanel;
+        private readonly HudChain categoryRowOne;
+        private readonly HudChain categoryRowTwo;
         private readonly ListBox<CatalogEntry> list;
         private readonly Label status;
         private CatalogIndex catalog;
         private CatalogResult currentResults;
         private bool updating;
+        private bool compactCategories;
 
         public CatalogEntry First
         {
@@ -71,11 +76,15 @@ namespace SEpedia.UI
             catalog = new CatalogIndex(definitions, planets);
             categoryButtons = new List<CategoryButton>();
 
-            categoryPanel = new HudChain(false)
+            categoryPanel = new HudChain(true)
             {
-                SizingMode = HudChainSizingModes.FitChainOffAxis,
+                SizingMode = HudChainSizingModes.FitChainAlignAxis | HudChainSizingModes.FitMembersOffAxis,
                 Spacing = 2f
             };
+            categoryRowOne = CreateCategoryRow();
+            categoryRowTwo = CreateCategoryRow();
+            categoryPanel.Add(categoryRowOne);
+            categoryPanel.Add(categoryRowTwo);
             AddCategoryButton(BrowseCategory.Components, 1.25f);
             AddCategoryButton(BrowseCategory.Ores, .65f);
             AddCategoryButton(BrowseCategory.Ingots, .75f);
@@ -85,7 +94,9 @@ namespace SEpedia.UI
             AddCategoryButton(BrowseCategory.GasBottles, 1.15f);
             AddCategoryButton(BrowseCategory.Items, .65f);
             AddCategoryButton(BrowseCategory.Blocks, .75f);
+            AddCategoryButton(BrowseCategory.Recipes, .85f);
             AddCategoryButton(BrowseCategory.Celestial, .95f);
+            RebuildCategoryRows(false);
             UpdateCategoryButtons();
 
             var filterButton = new LabelBoxButton
@@ -190,6 +201,13 @@ namespace SEpedia.UI
             Refresh();
         }
 
+        public void UpdateCategoryLayout(float availableWidth)
+        {
+            bool compact = availableWidth < 1050f;
+            if (compact != compactCategories)
+                RebuildCategoryRows(compact);
+        }
+
         public bool TrySelect(DefinitionDocument definition)
         {
             if (definition == null)
@@ -210,8 +228,34 @@ namespace SEpedia.UI
         private void AddCategoryButton(BrowseCategory category, float widthWeight)
         {
             LabelBoxButton button = CreateCategoryButton(category);
-            categoryButtons.Add(new CategoryButton(category, button));
-            categoryPanel.Add(button, widthWeight);
+            categoryButtons.Add(new CategoryButton(category, button, widthWeight));
+        }
+
+        private static HudChain CreateCategoryRow()
+        {
+            return new HudChain(false)
+            {
+                Height = 29f,
+                SizingMode = HudChainSizingModes.FitMembersOffAxis,
+                Spacing = 2f
+            };
+        }
+
+        private void RebuildCategoryRows(bool compact)
+        {
+            categoryRowOne.Clear();
+            categoryRowTwo.Clear();
+            compactCategories = compact;
+
+            int split = compact ? (categoryButtons.Count + 1) / 2 : categoryButtons.Count;
+            for (int index = 0; index < categoryButtons.Count; index++)
+            {
+                CategoryButton category = categoryButtons[index];
+                HudChain row = index < split ? categoryRowOne : categoryRowTwo;
+                row.Add(category.Button, category.WidthWeight);
+            }
+
+            categoryRowTwo.Visible = compact;
         }
 
         private LabelBoxButton CreateCategoryButton(BrowseCategory category)
@@ -277,6 +321,8 @@ namespace SEpedia.UI
                 return "Asteroid generator";
             if (entry.Definition.PlanetGenerator != null)
                 return "Planet definition";
+            if (entry.Category == BrowseCategory.Recipes)
+                return string.IsNullOrWhiteSpace(entry.ListDetail) ? "Recipe" : entry.ListDetail;
             switch (entry.Category)
             {
                 case BrowseCategory.Components: return "Component";

@@ -68,6 +68,7 @@ namespace SEpedia.Core
         public BrowseCategory Category { get; private set; }
         public string DisplayName { get; private set; }
         public string StableKey { get; private set; }
+        public string ListDetail { get; private set; }
         public int CelestialSortOrder { get; private set; }
 
         public bool IsSpawnedPlanet
@@ -92,15 +93,22 @@ namespace SEpedia.Core
 
         public bool AvailableInSurvival
         {
-            get { return Definition != null ? Definition.AvailableInSurvival : Planet.AvailableInSurvival; }
+            get
+            {
+                if (Definition != null && Definition.Recipe != null &&
+                    Definition.BrowseCategory == BrowseCategory.Recipes)
+                    return Definition.Recipe.ProductionMenuReachable;
+                return Definition != null ? Definition.AvailableInSurvival : Planet.AvailableInSurvival;
+            }
         }
 
-        public CatalogEntry(DefinitionDocument definition, int celestialSortOrder)
+        public CatalogEntry(DefinitionDocument definition, int celestialSortOrder, string listDetail = null)
         {
             Definition = definition;
             Category = definition.BrowseCategory;
             DisplayName = definition.DisplayName;
             StableKey = "definition:" + definition.Id;
+            ListDetail = listDetail ?? string.Empty;
             CelestialSortOrder = celestialSortOrder;
         }
 
@@ -110,6 +118,7 @@ namespace SEpedia.Core
             Category = BrowseCategory.Celestial;
             DisplayName = planet.DisplayName;
             StableKey = "planet:" + planet.EntityId;
+            ListDetail = string.Empty;
             CelestialSortOrder = 0;
         }
     }

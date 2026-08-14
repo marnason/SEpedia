@@ -27,6 +27,7 @@ namespace SEpedia.Core
         public CatalogIndex(DefinitionIndex definitions, IEnumerable<PlanetSnapshot> planets)
         {
             entriesByCategory = new Dictionary<BrowseCategory, List<SearchableEntry>>();
+            HashSet<MyDefinitionId> duplicateRecipeNames = FindDuplicateRecipeNames(definitions.All);
 
             for (int index = 0; index < definitions.All.Count; index++)
             {
@@ -35,13 +36,16 @@ namespace SEpedia.Core
                     continue;
 
                 int celestialOrder = definition.AsteroidGenerator != null ? 1 : 2;
-                Add(new CatalogEntry(definition, celestialOrder));
+                string listDetail = duplicateRecipeNames.Contains(definition.Id)
+                    ? BuildRecipeSummary(definition.Recipe, definitions)
+                    : string.Empty;
+                Add(new CatalogEntry(definition, celestialOrder, listDetail), definitions);
             }
 
             if (planets != null)
             {
                 foreach (PlanetSnapshot planet in planets)
-                    Add(new CatalogEntry(planet));
+                    Add(new CatalogEntry(planet), definitions);
             }
         }
 
@@ -101,6 +105,7 @@ namespace SEpedia.Core
                 case BrowseCategory.GasBottles: return "Gas Bottles";
                 case BrowseCategory.Items: return "Items";
                 case BrowseCategory.Blocks: return "Blocks";
+                case BrowseCategory.Recipes: return "Recipes";
                 case BrowseCategory.Celestial: return "Celestial";
                 default: return "Entries";
             }
@@ -130,7 +135,7 @@ namespace SEpedia.Core
             return builder.ToString();
         }
 
-        private void Add(CatalogEntry entry)
+        private void Add(CatalogEntry entry, DefinitionIndex definitions)
         {
             string subtype = entry.Definition != null ? entry.Definition.SubtypeName : entry.Planet.EntityId.ToString();
             string id = entry.Definition != null ? entry.Definition.Id.ToString() : entry.Planet.EntityId.ToString();
@@ -138,6 +143,9 @@ namespace SEpedia.Core
             string category = GetCategoryName(entry.Category);
             string name = Normalize(entry.DisplayName);
             string normalizedSubtype = Normalize(subtype);
+            string relationships = entry.Definition != null && entry.Definition.Recipe != null
+                ? BuildRecipeSearchBlob(entry.Definition.Recipe, definitions)
+                : string.Empty;
 
             var searchable = new SearchableEntry
             {
@@ -153,7 +161,8 @@ namespace SEpedia.Core
                     Normalize(runtimeType),
                     Normalize(entry.Origin.DisplayName),
                     Normalize(entry.Origin.ModId),
-                    Normalize(entry.Origin.ServiceName)
+                    Normalize(entry.Origin.ServiceName),
+                    Normalize(relationships)
                 })
             };
 
@@ -164,6 +173,90 @@ namespace SEpedia.Core
                 entriesByCategory.Add(entry.Category, categoryEntries);
             }
             categoryEntries.Add(searchable);
+        }
+
+        private static HashSet<MyDefinitionId> FindDuplicateRecipeNames(IReadOnlyList<DefinitionDocument> definitions)
+        {
+            var counts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            for (int index = 0; index < definitions.Count; index++)
+            {
+                DefinitionDocument definition = definitions[index];
+                if (definition.BrowseCategory != BrowseCategory.Recipes)
+                    continue;
+                int count;
+                counts.TryGetValue(definition.DisplayName, out count);
+                counts[definition.DisplayName] = count + 1;
+            }
+
+            var duplicates = new HashSet<MyDefinitionId>();
+            for (int index = 0; index < definitions.Count; index++)
+            {
+                DefinitionDocument definition = definitions[index];
+                int count;
+                if (definition.BrowseCategory == BrowseCategory.Recipes &&
+                    counts.TryGetValue(definition.DisplayName, out count) && count > 1)
+                    duplicates.Add(definition.Id);
+            }
+            return duplicates;
+        }
+
+        private static string BuildRecipeSummary(RecipeDocument recipe, DefinitionIndex definitions)
+        {
+            if (recipe == null)
+                return "Recipe";
+            return JoinItemNames(recipe.Prerequisites, definitions, 2) + " → " +
+                JoinItemNames(recipe.Results, definitions, 2);
+        }
+
+        private static string JoinItemNames(
+            IReadOnlyList<DefinitionAmount> amounts,
+            DefinitionIndex definitions,
+            int limit)
+        {
+            if (amounts.Count == 0)
+                return "None";
+
+            var builder = new StringBuilder();
+            int count = Math.Min(amounts.Count, limit);
+            for (int index = 0; index < count; index++)
+            {
+                if (builder.Length > 0)
+                    builder.Append(" + ");
+                DefinitionDocument item;
+                builder.Append(definitions.TryGet(amounts[index].DefinitionId, out item)
+                    ? item.DisplayName
+                    : amounts[index].DefinitionId.SubtypeName);
+            }
+            if (amounts.Count > limit)
+                builder.Append(" + …");
+            return builder.ToString();
+        }
+
+        private static string BuildRecipeSearchBlob(RecipeDocument recipe, DefinitionIndex definitions)
+        {
+            var builder = new StringBuilder();
+            AppendDefinitions(builder, recipe.Prerequisites, definitions);
+            AppendDefinitions(builder, recipe.Results, definitions);
+            for (int index = 0; index < recipe.ProductionBlocks.Count; index++)
+                AppendDefinition(builder, recipe.ProductionBlocks[index], definitions);
+            return builder.ToString();
+        }
+
+        private static void AppendDefinitions(
+            StringBuilder builder,
+            IReadOnlyList<DefinitionAmount> amounts,
+            DefinitionIndex definitions)
+        {
+            for (int index = 0; index < amounts.Count; index++)
+                AppendDefinition(builder, amounts[index].DefinitionId, definitions);
+        }
+
+        private static void AppendDefinition(StringBuilder builder, MyDefinitionId id, DefinitionIndex definitions)
+        {
+            DefinitionDocument definition;
+            if (definitions.TryGet(id, out definition))
+                builder.Append(' ').Append(definition.DisplayName).Append(' ').Append(definition.SubtypeName);
+            builder.Append(' ').Append(id);
         }
 
         private void BuildFacets(

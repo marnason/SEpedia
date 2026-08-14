@@ -133,8 +133,17 @@ namespace SEpedia
 
                 SEpediaLog.Info(
                     "Indexed " + built.All.Count + " of " + built.SourceCount + " definitions, " +
-                    built.Recipes.Count + " recipes, with " + built.IssueCount + " isolated issues in " +
+                    built.Recipes.Count + " recipes (" + built.Recipes.MenuCount + " production-menu reachable), with " +
+                    built.IssueCount + " isolated issues in " +
                     stopwatch.ElapsedMilliseconds + " ms.");
+                SEpediaLog.Info(
+                    "Icon resolution: " + built.IconStats.RenderableDefinitions + " of " +
+                    built.IconStats.DefinitionsWithIcons + " definitions renderable (" +
+                    built.IconStats.PathAliasDefinitions + " path aliases, " +
+                    built.IconStats.SameOriginDefinitions + " same-origin materials, " +
+                    built.IconStats.MixedDefinitions + " mixed); " +
+                    built.IconStats.UnresolvedDefinitions + " unresolved and " +
+                    built.IconStats.LayerLimitDefinitions + " above the layer limit.");
 
                 if (frontend != null)
                     frontend.AttachIndex(built, celestialIndex, survivalMode);

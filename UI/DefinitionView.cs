@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using RichHudFramework.UI;
 using RichHudFramework.UI.Rendering;
 using SEpedia.Core;
+using VRage;
 using VRage.Game;
 using VRageMath;
 
@@ -15,6 +16,8 @@ namespace SEpedia.UI
         private readonly DefinitionIndex index;
         private readonly ScrollBox content;
         private readonly List<HudElementBase> rows;
+        private readonly List<PagedDetailSection> pagedSections;
+        private readonly DefinitionHeader header;
         private float lastRowWidth;
         private bool layoutDirty;
 
@@ -22,6 +25,7 @@ namespace SEpedia.UI
         {
             this.index = index;
             rows = new List<HudElementBase>();
+            pagedSections = new List<PagedDetailSection>();
             lastRowWidth = -1f;
             layoutDirty = true;
 
@@ -33,24 +37,25 @@ namespace SEpedia.UI
                 Spacing = 3f,
                 UseSmoothScrolling = true
             };
-
+            header = new DefinitionHeader();
             ShowMessage("Select a definition to inspect it.");
         }
 
         public void Show(DefinitionDocument definition)
         {
             ClearRows();
-
-            AddHeading(definition.DisplayName, definition.Id.ToString(), definition.RuntimeTypeName);
-
-            if (!string.IsNullOrWhiteSpace(definition.Description))
-                AddDescription(definition.Description);
+            header.Update(
+                definition.DisplayName,
+                definition.Id.ToString(),
+                definition.RuntimeTypeName,
+                definition.Description,
+                definition.Icon);
+            AddRow(header.Root);
 
             AddKeyValue("Categories", definition.BrowseCategory != BrowseCategory.None
                 ? CatalogIndex.GetCategoryName(definition.BrowseCategory)
                 : (definition.Categories == DefinitionCategory.None ? "Linked definition" : definition.Categories.ToString()));
             AddKeyValue("Origin", definition.Origin.DisplayName);
-
             AddKeyValue("Flags", "Enabled: " + YesNo(definition.Enabled)
                 + "   Public: " + YesNo(definition.Public)
                 + "   Survival: " + YesNo(definition.AvailableInSurvival));
@@ -64,13 +69,10 @@ namespace SEpedia.UI
 
             if (definition.Recipe != null)
                 AddRecipe(definition.Recipe);
-
             if (definition.CubeBlock != null)
                 AddBlock(definition.CubeBlock);
-
             if (definition.PlanetGenerator != null)
                 AddPlanetGenerator(definition.PlanetGenerator);
-
             if (definition.AsteroidGenerator != null)
                 AddAsteroidGenerator(definition.AsteroidGenerator);
 
@@ -85,7 +87,6 @@ namespace SEpedia.UI
                 ShowMessage("Select an entry to inspect it.");
                 return;
             }
-
             if (entry.Definition != null)
                 Show(entry.Definition);
             else
@@ -107,11 +108,13 @@ namespace SEpedia.UI
             for (int index = 0; index < rows.Count; index++)
             {
                 rows[index].Width = rowWidth;
-
                 Label label = rows[index] as Label;
                 if (label != null)
                     label.LineWrapWidth = Math.Max(80f, rowWidth - label.Padding.X);
             }
+            header.SetWidth(rowWidth);
+            for (int index = 0; index < pagedSections.Count; index++)
+                pagedSections[index].SetWidth(rowWidth);
 
             lastRowWidth = rowWidth;
             layoutDirty = false;
@@ -122,8 +125,10 @@ namespace SEpedia.UI
             AddSection("Recipe");
             AddKeyValue("Base time", recipe.BaseProductionTimeSeconds.ToString("0.###") + " s");
             AddKeyValue("Atomic", YesNo(recipe.Atomic));
-            AddRelationshipAmounts("Prerequisites", recipe.Prerequisites);
-            AddRelationshipAmounts("Results", recipe.Results);
+            AddPagedSection("Inputs", CreateAmountItems(recipe.Prerequisites), false, true);
+            AddPagedSection("Outputs", CreateAmountItems(recipe.Results), false, true);
+            if (recipe.ProductionBlocks.Count > 0)
+                AddPagedSection("Available in production blocks", CreateProductionBlockItems(recipe.ProductionBlocks), false, false);
         }
 
         private void AddBlock(CubeBlockData block)
@@ -138,30 +143,32 @@ namespace SEpedia.UI
                 AddKeyValue("Block pair", block.BlockPairName);
 
             if (block.RelatedBlocks.Count > 0)
-            {
-                AddSubheading("Variants and paired sizes");
-                for (int index = 0; index < block.RelatedBlocks.Count; index++)
-                    AddDefinitionLink(block.RelatedBlocks[index], string.Empty);
-            }
+                AddPagedSection("Variants and paired sizes", CreateDefinitionItems(block.RelatedBlocks), false, false);
 
-            AddSubheading("Components");
-            if (block.Components.Count == 0)
-            {
-                AddParagraph("No component requirements were registered.");
-                return;
-            }
-
+            var components = new List<DetailItem>();
             for (int componentIndex = 0; componentIndex < block.Components.Count; componentIndex++)
             {
                 BlockComponentRequirement requirement = block.Components[componentIndex];
-                AddDefinitionLink(requirement.ComponentId, requirement.Count + " × ");
+                components.Add(CreateDefinitionItem(requirement.ComponentId, requirement.Count + " × "));
             }
+            AddPagedSection("Components", components, false, true);
         }
 
         private void ShowPlanet(PlanetSnapshot planet)
         {
             ClearRows();
-            AddHeading(planet.DisplayName, planet.EntityId.ToString(), "Spawned planet");
+            DefinitionIconData icon = null;
+            DefinitionDocument generator;
+            if (planet.GeneratorId.HasValue && index.TryGet(planet.GeneratorId.Value, out generator))
+                icon = generator.Icon;
+            header.Update(
+                planet.DisplayName,
+                planet.EntityId.ToString(),
+                "Spawned planet",
+                string.Empty,
+                icon);
+            AddRow(header.Root);
+
             AddKeyValue("Position", FormatVector(planet.Position));
             AddKeyValue("Minimum radius", FormatDistance(planet.MinimumRadius));
             AddKeyValue("Average radius", FormatDistance(planet.AverageRadius));
@@ -177,16 +184,13 @@ namespace SEpedia.UI
                     + "   Public: " + YesNo(planet.Public)
                     + "   Survival: " + YesNo(planet.AvailableInSurvival));
             }
-
             if (planet.GeneratorId.HasValue)
             {
                 AddSection("Generator");
                 AddDefinitionLink(planet.GeneratorId.Value, string.Empty);
             }
-
             if (planet.GeneratorData != null)
                 AddPlanetGenerator(planet.GeneratorData);
-
             content.Start = 0;
         }
 
@@ -206,21 +210,22 @@ namespace SEpedia.UI
             AddKeyValue("Weather interval", planet.WeatherFrequencyMin + "–" + planet.WeatherFrequencyMax);
             if (!string.IsNullOrWhiteSpace(planet.PersistentWeather))
                 AddKeyValue("Persistent weather", planet.PersistentWeather);
-            if (planet.WeatherTypes.Count > 0)
+
+            var weather = new List<DetailItem>();
+            for (int index = 0; index < planet.WeatherTypes.Count; index++)
+                weather.Add(new DetailItem(planet.WeatherTypes[index]));
+            if (weather.Count > 0)
+                AddPagedSection("Weather types", weather, false, false);
+
+            var ores = new List<DetailItem>();
+            for (int index = 0; index < planet.Ores.Count; index++)
             {
-                AddSubheading("Weather types");
-                for (int index = 0; index < planet.WeatherTypes.Count; index++)
-                    AddParagraph(planet.WeatherTypes[index]);
+                PlanetOreData ore = planet.Ores[index];
+                ores.Add(new DetailItem(ore.Material + " — start " + ore.Start.ToString("0.###") +
+                    ", depth " + ore.Depth.ToString("0.###")));
             }
-            if (planet.Ores.Count > 0)
-            {
-                AddSubheading("Ore mappings");
-                for (int index = 0; index < planet.Ores.Count; index++)
-                {
-                    PlanetOreData ore = planet.Ores[index];
-                    AddParagraph(ore.Material + " — start " + ore.Start.ToString("0.###") + ", depth " + ore.Depth.ToString("0.###"));
-                }
-            }
+            if (ores.Count > 0)
+                AddPagedSection("Ore mappings", ores, false, false);
         }
 
         private void AddAsteroidGenerator(AsteroidGeneratorData asteroid)
@@ -236,125 +241,168 @@ namespace SEpedia.UI
             AddKeyValue("Absolute dispersion", YesNo(asteroid.AbsoluteClusterDispersion));
             AddKeyValue("Rotate asteroids", YesNo(asteroid.RotateAsteroids));
             AddKeyValue("Variable cluster size", YesNo(asteroid.VariableClusterSize));
-            AddStringList("Object probabilities", asteroid.SeedProbabilities);
-            AddStringList("Cluster probabilities", asteroid.ClusterSeedProbabilities);
+            AddStringSection("Object probabilities", asteroid.SeedProbabilities);
+            AddStringSection("Cluster probabilities", asteroid.ClusterSeedProbabilities);
         }
 
-        private void AddStringList(string heading, IReadOnlyList<string> values)
+        private void AddStringSection(string headingText, IReadOnlyList<string> values)
         {
             if (values.Count == 0)
                 return;
-            AddSubheading(heading);
+            var items = new List<DetailItem>();
             for (int index = 0; index < values.Count; index++)
-                AddParagraph(values[index]);
+                items.Add(new DetailItem(values[index]));
+            AddPagedSection(headingText, items, false, false);
         }
 
         private void AddReverseRelationships(MyDefinitionId definitionId)
         {
-            IReadOnlyList<RecipeDocument> producing = index.Recipes.GetProducingRecipes(definitionId);
+            IReadOnlyList<RecipeDocument> producing = index.Recipes.GetMenuProducingRecipes(definitionId);
             if (producing.Count > 0)
-            {
-                AddSection("Produced by");
-                for (int recipeIndex = 0; recipeIndex < producing.Count; recipeIndex++)
-                    AddDefinitionLink(producing[recipeIndex].DefinitionId, string.Empty);
-            }
+                AddPagedSection("Produced by recipes", CreateRecipeItems(producing, definitionId, false), true, false);
 
-            IReadOnlyList<RecipeDocument> consuming = index.Recipes.GetConsumingRecipes(definitionId);
+            IReadOnlyList<RecipeDocument> consuming = index.Recipes.GetMenuConsumingRecipes(definitionId);
             if (consuming.Count > 0)
-            {
-                AddSection("Consumed by");
-                for (int recipeIndex = 0; recipeIndex < consuming.Count; recipeIndex++)
-                    AddDefinitionLink(consuming[recipeIndex].DefinitionId, string.Empty);
-            }
+                AddPagedSection("Used in recipes", CreateRecipeItems(consuming, definitionId, true), true, false);
 
             IReadOnlyList<BlockUsage> usages = index.GetBlocksUsing(definitionId);
             if (usages.Count > 0)
             {
-                AddSection("Used in blocks");
+                var items = new List<DetailItem>();
                 for (int usageIndex = 0; usageIndex < usages.Count; usageIndex++)
-                    AddDefinitionLink(usages[usageIndex].BlockId, usages[usageIndex].Count + " × ");
+                    items.Add(CreateDefinitionItem(usages[usageIndex].BlockId, usages[usageIndex].Count + " × "));
+                AddPagedSection("Used in blocks", items, true, false);
             }
         }
 
-        private void AddRelationshipAmounts(string heading, IReadOnlyList<DefinitionAmount> amounts)
+        private List<DetailItem> CreateRecipeItems(
+            IReadOnlyList<RecipeDocument> recipes,
+            MyDefinitionId itemId,
+            bool consumed)
         {
-            AddSubheading(heading);
-
-            if (amounts.Count == 0)
+            var items = new List<DetailItem>();
+            for (int recipeIndex = 0; recipeIndex < recipes.Count; recipeIndex++)
             {
-                AddParagraph("None");
-                return;
+                RecipeDocument recipe = recipes[recipeIndex];
+                MyFixedPoint amount = GetAmount(consumed ? recipe.Prerequisites : recipe.Results, itemId);
+                DetailItem item = CreateDefinitionItem(recipe.DefinitionId, FormatAmount(amount, itemId));
+                if (item.LinkId.HasValue)
+                    item = new DetailItem(item.Text + " — " + BuildRecipeSummary(recipe), item.LinkId);
+                items.Add(item);
             }
+            return items;
+        }
 
+        private List<DetailItem> CreateAmountItems(IReadOnlyList<DefinitionAmount> amounts)
+        {
+            var items = new List<DetailItem>();
             for (int amountIndex = 0; amountIndex < amounts.Count; amountIndex++)
-                AddDefinitionLink(amounts[amountIndex].DefinitionId, amounts[amountIndex].Amount + " × ");
+            {
+                DefinitionAmount amount = amounts[amountIndex];
+                items.Add(CreateDefinitionItem(amount.DefinitionId, FormatAmount(amount.Amount, amount.DefinitionId)));
+            }
+            return items;
+        }
+
+        private List<DetailItem> CreateDefinitionItems(IReadOnlyList<MyDefinitionId> ids)
+        {
+            var items = new List<DetailItem>();
+            for (int itemIndex = 0; itemIndex < ids.Count; itemIndex++)
+                items.Add(CreateDefinitionItem(ids[itemIndex], string.Empty));
+            return items;
+        }
+
+        private List<DetailItem> CreateProductionBlockItems(IReadOnlyList<MyDefinitionId> ids)
+        {
+            var items = new List<DetailItem>();
+            for (int itemIndex = 0; itemIndex < ids.Count; itemIndex++)
+            {
+                DefinitionDocument block;
+                if (!index.TryGet(ids[itemIndex], out block))
+                {
+                    items.Add(new DetailItem(ids[itemIndex] + " (definition unavailable)"));
+                    continue;
+                }
+
+                string grid = block.CubeBlock != null ? " — " + block.CubeBlock.CubeSize + " grid" : string.Empty;
+                items.Add(new DetailItem(block.DisplayName + grid, block.Id));
+            }
+            return items;
+        }
+
+        private string BuildRecipeSummary(RecipeDocument recipe)
+        {
+            return JoinAmountNames(recipe.Prerequisites, 2) + " → " + JoinAmountNames(recipe.Results, 2);
+        }
+
+        private string JoinAmountNames(IReadOnlyList<DefinitionAmount> amounts, int limit)
+        {
+            if (amounts.Count == 0)
+                return "None";
+
+            var names = new List<string>();
+            int count = Math.Min(amounts.Count, limit);
+            for (int itemIndex = 0; itemIndex < count; itemIndex++)
+            {
+                DefinitionDocument item;
+                names.Add(index.TryGet(amounts[itemIndex].DefinitionId, out item)
+                    ? item.DisplayName
+                    : amounts[itemIndex].DefinitionId.SubtypeName);
+            }
+            string result = string.Join(" + ", names);
+            return amounts.Count > limit ? result + " + …" : result;
+        }
+
+        private DetailItem CreateDefinitionItem(MyDefinitionId definitionId, string prefix)
+        {
+            DefinitionDocument target;
+            if (!index.TryGet(definitionId, out target))
+                return new DetailItem(prefix + definitionId + " (definition unavailable)");
+            return new DetailItem(prefix + target.DisplayName, definitionId);
         }
 
         private void AddDefinitionLink(MyDefinitionId definitionId, string prefix)
         {
-            DefinitionDocument target;
-            if (!index.TryGet(definitionId, out target))
+            DetailItem item = CreateDefinitionItem(definitionId, prefix);
+            if (!item.LinkId.HasValue)
             {
-                AddParagraph(prefix + definitionId + " (definition unavailable)");
+                AddParagraph(item.Text);
                 return;
             }
 
-            MyDefinitionId capturedId = definitionId;
+            MyDefinitionId capturedId = item.LinkId.Value;
             var link = new LabelButton
             {
-                Text = new RichText(prefix + target.DisplayName, GlyphFormat.Blueish.WithStyle(FontStyles.Underline).WithSize(.88f)),
+                Text = new RichText(item.Text, GlyphFormat.Blueish.WithStyle(FontStyles.Underline).WithSize(.88f)),
                 BuilderMode = TextBuilderModes.Wrapped,
                 AutoResize = true,
                 VertCenterText = false,
                 Padding = new Vector2(12f, 2f)
             };
-            link.MouseInput.LeftClicked += delegate
-            {
-                if (LinkClicked != null)
-                    LinkClicked(capturedId);
-            };
-
+            link.MouseInput.LeftClicked += delegate { RaiseLinkClicked(capturedId); };
             AddRow(link);
         }
 
-        private void AddHeading(string text, string id, string type)
+        private void AddPagedSection(
+            string headingText,
+            IList<DetailItem> items,
+            bool majorHeading,
+            bool showEmpty)
         {
-            var label = new Label
+            if (items.Count == 0)
             {
-                Text = new RichText(text, GlyphFormat.White.WithSize(1.25f)),
-                Height = 36f,
-                AutoResize = false,
-                VertCenterText = true,
-                Padding = new Vector2(8f, 4f)
-            };
-            new MouseInputElement(label)
-            {
-                ToolTip = "ID: " + (id ?? string.Empty) + "\nType: " + (type ?? string.Empty)
-            };
-            AddRow(label);
-        }
-
-        private void AddDescription(string text)
-        {
-            var label = new Label
-            {
-                Text = new RichText(text ?? string.Empty, GlyphFormat.White.WithAlignment(TextAlignment.Center).WithSize(.82f)),
-                BuilderMode = TextBuilderModes.Wrapped,
-                AutoResize = true,
-                VertCenterText = false,
-                Padding = new Vector2(18f, 4f)
-            };
-            AddRow(label);
+                if (!showEmpty)
+                    return;
+                items.Add(new DetailItem("None"));
+            }
+            var section = new PagedDetailSection(RaiseLinkClicked, headingText, items, majorHeading);
+            pagedSections.Add(section);
+            AddRow(section.Root);
         }
 
         private void AddSection(string text)
         {
             AddLabel(new RichText(text, GlyphFormat.Blueish.WithSize(1.02f)), 31f, new Vector2(8f, 7f));
-        }
-
-        private void AddSubheading(string text)
-        {
-            AddLabel(new RichText(text, GlyphFormat.White.WithSize(.92f)), 25f, new Vector2(8f, 3f));
         }
 
         private void AddKeyValue(string key, string value)
@@ -402,7 +450,35 @@ namespace SEpedia.UI
         {
             content.Clear();
             rows.Clear();
+            pagedSections.Clear();
             layoutDirty = true;
+        }
+
+        private void RaiseLinkClicked(MyDefinitionId id)
+        {
+            Action<MyDefinitionId> handler = LinkClicked;
+            if (handler != null)
+                handler(id);
+        }
+
+        private string FormatAmount(MyFixedPoint amount, MyDefinitionId itemId)
+        {
+            DefinitionDocument item;
+            if (index.TryGet(itemId, out item) &&
+                (item.Categories & (DefinitionCategory.Ore | DefinitionCategory.Ingot)) != 0)
+                return amount + " m³ ";
+            return amount + " × ";
+        }
+
+        private static MyFixedPoint GetAmount(IReadOnlyList<DefinitionAmount> amounts, MyDefinitionId itemId)
+        {
+            MyFixedPoint total = (MyFixedPoint)0;
+            for (int index = 0; index < amounts.Count; index++)
+            {
+                if (amounts[index].DefinitionId == itemId)
+                    total += amounts[index].Amount;
+            }
+            return total;
         }
 
         private static string YesNo(bool value)
@@ -417,7 +493,7 @@ namespace SEpedia.UI
                 : metres.ToString("0.###") + " m";
         }
 
-        private static string FormatVector(VRageMath.Vector3D value)
+        private static string FormatVector(Vector3D value)
         {
             return value.X.ToString("0.##") + ", " + value.Y.ToString("0.##") + ", " + value.Z.ToString("0.##");
         }

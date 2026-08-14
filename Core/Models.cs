@@ -31,7 +31,8 @@ namespace SEpedia.Core
         GasBottles = 7,
         Items = 8,
         Blocks = 9,
-        Celestial = 10
+        Recipes = 10,
+        Celestial = 11
     }
 
     public enum TriStateFilter
@@ -133,19 +134,24 @@ namespace SEpedia.Core
         public bool Atomic { get; private set; }
         public IReadOnlyList<DefinitionAmount> Prerequisites { get; private set; }
         public IReadOnlyList<DefinitionAmount> Results { get; private set; }
+        public bool ProductionMenuReachable { get; private set; }
+        public IReadOnlyList<MyDefinitionId> ProductionBlocks { get; private set; }
 
         public RecipeDocument(
             MyDefinitionId definitionId,
             float baseProductionTimeSeconds,
             bool atomic,
             IList<DefinitionAmount> prerequisites,
-            IList<DefinitionAmount> results)
+            IList<DefinitionAmount> results,
+            IList<MyDefinitionId> productionBlocks)
         {
             DefinitionId = definitionId;
             BaseProductionTimeSeconds = baseProductionTimeSeconds;
             Atomic = atomic;
             Prerequisites = new List<DefinitionAmount>(prerequisites).AsReadOnly();
             Results = new List<DefinitionAmount>(results).AsReadOnly();
+            ProductionBlocks = new List<MyDefinitionId>(productionBlocks).AsReadOnly();
+            ProductionMenuReachable = ProductionBlocks.Count > 0;
         }
     }
 
@@ -325,12 +331,59 @@ namespace SEpedia.Core
         }
     }
 
+    public sealed class DefinitionIconData
+    {
+        public IReadOnlyList<string> TexturePaths { get; private set; }
+        public IReadOnlyList<string> MaterialIds { get; private set; }
+
+        public bool IsRenderable
+        {
+            get { return TexturePaths.Count > 0 && TexturePaths.Count == MaterialIds.Count; }
+        }
+
+        public DefinitionIconData(IList<string> texturePaths, IList<string> materialIds)
+        {
+            TexturePaths = new List<string>(texturePaths).AsReadOnly();
+            MaterialIds = new List<string>(materialIds).AsReadOnly();
+        }
+    }
+
+    public sealed class DefinitionIconStats
+    {
+        public int DefinitionsWithIcons { get; private set; }
+        public int RenderableDefinitions { get; private set; }
+        public int PathAliasDefinitions { get; private set; }
+        public int SameOriginDefinitions { get; private set; }
+        public int MixedDefinitions { get; private set; }
+        public int UnresolvedDefinitions { get; private set; }
+        public int LayerLimitDefinitions { get; private set; }
+
+        public DefinitionIconStats(
+            int definitionsWithIcons,
+            int renderableDefinitions,
+            int pathAliasDefinitions,
+            int sameOriginDefinitions,
+            int mixedDefinitions,
+            int unresolvedDefinitions,
+            int layerLimitDefinitions)
+        {
+            DefinitionsWithIcons = definitionsWithIcons;
+            RenderableDefinitions = renderableDefinitions;
+            PathAliasDefinitions = pathAliasDefinitions;
+            SameOriginDefinitions = sameOriginDefinitions;
+            MixedDefinitions = mixedDefinitions;
+            UnresolvedDefinitions = unresolvedDefinitions;
+            LayerLimitDefinitions = layerLimitDefinitions;
+        }
+    }
+
     public sealed class DefinitionDocument
     {
         public MyDefinitionId Id { get; private set; }
         public string DisplayName { get; private set; }
         public string Description { get; private set; }
         public string RuntimeTypeName { get; private set; }
+        public DefinitionIconData Icon { get; private set; }
         public DefinitionCategory Categories { get; private set; }
         public BrowseCategory BrowseCategory { get; private set; }
         public DefinitionOrigin Origin { get; private set; }
@@ -353,6 +406,7 @@ namespace SEpedia.Core
             string displayName,
             string description,
             string runtimeTypeName,
+            DefinitionIconData icon,
             DefinitionCategory categories,
             BrowseCategory browseCategory,
             DefinitionOrigin origin,
@@ -369,6 +423,7 @@ namespace SEpedia.Core
             DisplayName = displayName;
             Description = description;
             RuntimeTypeName = runtimeTypeName;
+            Icon = icon;
             Categories = categories;
             BrowseCategory = browseCategory;
             Origin = origin;
