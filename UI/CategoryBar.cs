@@ -70,7 +70,6 @@ namespace SEpedia.UI
             Add(BrowseCategory.Ammo);
             Add(BrowseCategory.ToolsAndWeapons);
             Add(BrowseCategory.Consumables);
-            Add(BrowseCategory.GasBottles);
             Add(BrowseCategory.Items);
             Add(BrowseCategory.Blocks);
             Add(BrowseCategory.Recipes);

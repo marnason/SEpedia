@@ -13,7 +13,6 @@ namespace SEpedia.Core
         Ammo = 4,
         ToolsAndWeapons = 5,
         Consumables = 6,
-        GasBottles = 7,
         Items = 8,
         Blocks = 9,
         Recipes = 10,

@@ -19,7 +19,6 @@ namespace SEpedia.Core
                 case BrowseCategory.Ammo: return "Ammo";
                 case BrowseCategory.ToolsAndWeapons: return "Tools & Weapons";
                 case BrowseCategory.Consumables: return "Consumables";
-                case BrowseCategory.GasBottles: return "Gas Bottles";
                 case BrowseCategory.Items: return "Items";
                 case BrowseCategory.Blocks: return "Blocks";
                 case BrowseCategory.Recipes: return "Recipes";
@@ -30,32 +29,7 @@ namespace SEpedia.Core
 
         #endregion
 
-        #region Entry Labels and Runtime Types
-
-        public static string GetEntryLabel(CatalogEntry entry)
-        {
-            if (entry.IsSpawnedPlanet)
-                return "Spawned planet";
-            if (entry.Definition.AsteroidGenerator != null)
-                return "Asteroid generator";
-            if (entry.Definition.PlanetGenerator != null)
-                return "Planet definition";
-            if (entry.Category == BrowseCategory.Recipes)
-                return string.IsNullOrWhiteSpace(entry.ListDetail) ? "Recipe" : entry.ListDetail;
-            switch (entry.Category)
-            {
-                case BrowseCategory.Components: return "Component";
-                case BrowseCategory.Ores: return "Ore";
-                case BrowseCategory.Ingots: return "Ingot";
-                case BrowseCategory.Ammo: return "Ammo";
-                case BrowseCategory.ToolsAndWeapons: return "Tool / weapon";
-                case BrowseCategory.Consumables: return "Consumable";
-                case BrowseCategory.GasBottles: return "Gas bottle";
-                case BrowseCategory.Items: return "Item";
-                case BrowseCategory.Blocks: return "Block";
-                default: return "Entry";
-            }
-        }
+        #region Runtime Types
 
         public static string GetFriendlyRuntimeType(string runtimeType)
         {

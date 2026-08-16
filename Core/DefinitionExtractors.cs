@@ -172,7 +172,7 @@ namespace SEpedia.Core
             if (definition.IsOre) return BrowseCategory.Ores;
             if (definition.IsIngot) return BrowseCategory.Ingots;
             if (definition is MyAmmoMagazineDefinition) return BrowseCategory.Ammo;
-            if (definition is MyOxygenContainerDefinition) return BrowseCategory.GasBottles;
+            if (definition is MyOxygenContainerDefinition) return BrowseCategory.ToolsAndWeapons;
             if (definition is MyConsumableItemDefinition) return BrowseCategory.Consumables;
             if (definition is MyToolItemDefinition || definition is MyWeaponItemDefinition)
                 return BrowseCategory.ToolsAndWeapons;

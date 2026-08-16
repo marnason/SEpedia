@@ -142,7 +142,6 @@ namespace SEpedia.UI
                     CatalogEntry entry = currentResults.Items[itemIndex];
                     var text = new RichText();
                     text.Add(entry.DisplayName, GlyphFormat.White.WithSize(.83f));
-                    text.Add("  " + CatalogText.GetEntryLabel(entry), GlyphFormat.Blueish.WithSize(.65f));
                     list.Add(text, entry);
                     if (entry.StableKey == previousKey)
                         selectedIndex = itemIndex;

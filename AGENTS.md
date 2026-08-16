@@ -6,7 +6,7 @@ MUST and MUST NOT are requirements. SHOULD is the default unless repository evid
 
 - SEpedia is a scripted C# Space Engineers mod built with MDK². Preserve the scaffold, analyzers, packager, references, and package versions unless the task requires changing them.
 - First-party code MUST remain compatible with .NET Framework 4.8 and C# 6 and MUST pass `scripts/check-script-sandbox.sh`. Do not suppress MDK diagnostics or use `#pragma warning`; the in-game compiler rejects prohibited members independently of local builds.
-- Use `SEpedia.sln`. Run routine verification through `scripts/verify.sh`; use `scripts/deploy.sh` only for an explicitly required local package or deployment. Do not automate a bare `dotnet build` because MDK may become interactive.
+- Use `SEpedia.sln`. Run routine verification through `scripts/verify.sh`, then finish every implementation change by running the single deployment entry point, `scripts/deploy.sh`. Do not automate a bare `dotnet build` because MDK may become interactive.
 - Portable code and guidance MUST NOT contain machine-specific paths, users, Steam roots, or deployment destinations.
 
 ## Architecture and frontend
@@ -27,7 +27,7 @@ MUST and MUST NOT are requirements. SHOULD is the default unless repository evid
 ## Verification
 
 - Begin code or project verification with `scripts/verify.sh` and treat MDK warnings and errors as build failures. Confirm generated output and machine-local `mdk.local.ini` variants remain ignored and untracked.
-- Use `scripts/deploy.sh` for package/deploy checks and confirm packaged content when layout or content changes. Report runtime checks that cannot be performed.
+- Use `scripts/deploy.sh` after every implementation change. Do not inspect deployed contents unless the user explicitly requests it or deployment reports a failure. Report runtime checks that cannot be performed.
 - UI, lifecycle, multiplayer, dedicated-server, or runtime-indexing changes require proportionate in-game verification. For Rich HUD changes, test text entry, gameplay-input suppression, vanilla-HUD overlap/restoration, reset, unload, and minimum/default/large layouts.
 - Before an experiment that can mutate live definition or session state, disable autosave or use a disposable save. Stop without saving on any integrity failure and restore the save before retrying.
 - When mirroring a vanilla menu, use its actual runtime eligibility semantics and confirm every browse category receives a vanilla entry.

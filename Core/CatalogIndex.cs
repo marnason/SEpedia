@@ -32,7 +32,6 @@ namespace SEpedia.Core
         public CatalogIndex(DefinitionIndex definitions, IEnumerable<PlanetSnapshot> planets)
         {
             entriesByCategory = new Dictionary<BrowseCategory, List<SearchableEntry>>();
-            HashSet<MyDefinitionId> duplicateRecipeNames = FindDuplicateRecipeNames(definitions.All);
 
             for (int index = 0; index < definitions.All.Count; index++)
             {
@@ -41,10 +40,7 @@ namespace SEpedia.Core
                     continue;
 
                 int celestialOrder = definition.AsteroidGenerator != null ? 1 : 2;
-                string listDetail = duplicateRecipeNames.Contains(definition.Id)
-                    ? CatalogText.BuildRecipeSummary(definition.Recipe, definitions)
-                    : string.Empty;
-                Add(new CatalogEntry(definition, celestialOrder, listDetail), definitions);
+                Add(new CatalogEntry(definition, celestialOrder), definitions);
             }
 
             if (planets != null)
@@ -92,31 +88,6 @@ namespace SEpedia.Core
                 entriesByCategory.Add(entry.Category, categoryEntries);
             }
             categoryEntries.Add(searchable);
-        }
-
-        private static HashSet<MyDefinitionId> FindDuplicateRecipeNames(IReadOnlyList<DefinitionDocument> definitions)
-        {
-            var counts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-            for (int index = 0; index < definitions.Count; index++)
-            {
-                DefinitionDocument definition = definitions[index];
-                if (definition.BrowseCategory != BrowseCategory.Recipes)
-                    continue;
-                int count;
-                counts.TryGetValue(definition.DisplayName, out count);
-                counts[definition.DisplayName] = count + 1;
-            }
-
-            var duplicates = new HashSet<MyDefinitionId>();
-            for (int index = 0; index < definitions.Count; index++)
-            {
-                DefinitionDocument definition = definitions[index];
-                int count;
-                if (definition.BrowseCategory == BrowseCategory.Recipes &&
-                    counts.TryGetValue(definition.DisplayName, out count) && count > 1)
-                    duplicates.Add(definition.Id);
-            }
-            return duplicates;
         }
 
         #endregion
