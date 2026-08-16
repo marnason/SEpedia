@@ -1,5 +1,12 @@
 # Third-party provenance
 
+## Workshop thumbnail generator
+
+The repository-root `thumb.png` was generated with [se-mod-thumbnails](https://github.com/marnason/se-mod-thumbnails) at commit `3e6e2e55b896abe19a7e9fb43776fb58a8cf63ef`, using the text `SEpedia`, background color `#0000`, and padding `100`.
+
+- Generator source: public domain under The Unlicense
+- Space Engineers typeface: sourced by the generator from the Space Engineers Mod SDK and retained under the rights of Keen Software House and/or its licensors
+
 ## Rich HUD Framework client snapshot
 
 SEpedia vendors a source snapshot under `RichHudFramework/` so the mod can compile against the Rich HUD client API without a runtime assembly dependency.
