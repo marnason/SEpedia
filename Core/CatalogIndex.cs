@@ -100,6 +100,22 @@ namespace SEpedia.Core
             return Query(filter, offset, limit, null);
         }
 
+        public bool HasMultipleDefaultEntries(BrowseCategory category, bool survivalMode)
+        {
+            List<SearchableEntry> categoryEntries;
+            if (!entriesByCategory.TryGetValue(category, out categoryEntries))
+                return false;
+
+            var defaultFilter = new CatalogFilter(survivalMode) { Category = category };
+            int count = 0;
+            for (int index = 0; index < categoryEntries.Count; index++)
+            {
+                if (MatchesAllFilters(categoryEntries[index].Entry, defaultFilter) && ++count > 1)
+                    return true;
+            }
+            return false;
+        }
+
         public CatalogResult Query(
             CatalogFilter filter,
             int offset,

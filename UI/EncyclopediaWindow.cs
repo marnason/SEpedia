@@ -67,7 +67,7 @@ namespace SEpedia.UI
             };
             closeButton.MouseInput.ToolTip = "Close";
 
-            definitionList = new DefinitionList(index, filter, celestial != null ? celestial.Planets : null)
+            definitionList = new DefinitionList(index, filter, celestial != null ? celestial.Planets : null, survivalMode)
             {
                 Width = 252f
             };

@@ -16,6 +16,7 @@ namespace SEpedia.UI
             public readonly BrowseCategory Category;
             public readonly LabelBoxButton Button;
             public readonly float MinimumWidth;
+            public bool Available;
 
             public CategoryButton(
                 BrowseCategory category,
@@ -25,6 +26,7 @@ namespace SEpedia.UI
                 Category = category;
                 Button = button;
                 MinimumWidth = minimumWidth;
+                Available = true;
             }
         }
 
@@ -34,6 +36,7 @@ namespace SEpedia.UI
         private readonly List<CategoryButton> buttons;
         private readonly HudChain[] rows;
         private int activeRows;
+        private float availableWidth;
 
         public HudChain Root { get; private set; }
 
@@ -47,6 +50,7 @@ namespace SEpedia.UI
             this.categoryChanged = categoryChanged;
             buttons = new List<CategoryButton>();
             rows = new HudChain[MaximumRows];
+            availableWidth = 1f;
 
             Root = new HudChain(true)
             {
@@ -84,15 +88,51 @@ namespace SEpedia.UI
 
         public void UpdateLayout(float availableWidth)
         {
-            float requiredWidth = 0f;
-            for (int index = 0; index < buttons.Count; index++)
-                requiredWidth += buttons[index].MinimumWidth;
-            requiredWidth += (buttons.Count - 1) * 2f;
-
-            int rowCount = Math.Max(1, Math.Min(MaximumRows,
-                (int)Math.Ceiling(requiredWidth / Math.Max(1f, availableWidth))));
+            this.availableWidth = Math.Max(1f, availableWidth);
+            int rowCount = GetRowCount(this.availableWidth);
             if (rowCount != activeRows)
                 Reflow(rowCount);
+        }
+
+        public void UpdateAvailability(Func<BrowseCategory, bool> isAvailable)
+        {
+            CategoryButton firstAvailable = null;
+            bool selectedAvailable = false;
+
+            for (int index = 0; index < buttons.Count; index++)
+            {
+                CategoryButton categoryButton = buttons[index];
+                categoryButton.Available = isAvailable != null && isAvailable(categoryButton.Category);
+                if (!categoryButton.Available)
+                    continue;
+                if (firstAvailable == null)
+                    firstAvailable = categoryButton;
+                selectedAvailable |= categoryButton.Category == filter.Category;
+            }
+
+            if (!selectedAvailable && firstAvailable != null)
+                filter.Category = firstAvailable.Category;
+
+            Reflow(GetRowCount(availableWidth));
+            UpdateSelection();
+        }
+
+        private int GetRowCount(float width)
+        {
+            float requiredWidth = 0f;
+            int availableCount = 0;
+            for (int index = 0; index < buttons.Count; index++)
+            {
+                if (!buttons[index].Available)
+                    continue;
+                requiredWidth += buttons[index].MinimumWidth;
+                availableCount++;
+            }
+            requiredWidth += Math.Max(0, availableCount - 1) * 2f;
+
+            int maximumRows = Math.Max(1, Math.Min(MaximumRows, availableCount));
+            return Math.Max(1, Math.Min(maximumRows,
+                (int)Math.Ceiling(requiredWidth / Math.Max(1f, width))));
         }
 
         #endregion
@@ -148,8 +188,14 @@ namespace SEpedia.UI
                 rows[row].Clear();
 
             float total = 0f;
+            int availableCount = 0;
             for (int index = 0; index < buttons.Count; index++)
+            {
+                if (!buttons[index].Available)
+                    continue;
                 total += buttons[index].MinimumWidth;
+                availableCount++;
+            }
             float target = total / rowCount;
             int currentRow = 0;
             float currentWidth = 0f;
@@ -157,7 +203,9 @@ namespace SEpedia.UI
             for (int index = 0; index < buttons.Count; index++)
             {
                 CategoryButton button = buttons[index];
-                int buttonsRemaining = buttons.Count - index;
+                if (!button.Available)
+                    continue;
+                int buttonsRemaining = availableCount;
                 int rowsRemaining = rowCount - currentRow;
                 if (currentRow < rowCount - 1 && currentWidth > 0f &&
                     currentWidth + button.MinimumWidth > target && buttonsRemaining >= rowsRemaining)
@@ -167,6 +215,7 @@ namespace SEpedia.UI
                 }
                 rows[currentRow].Add(button.Button, button.MinimumWidth);
                 currentWidth += button.MinimumWidth;
+                availableCount--;
             }
 
             activeRows = rowCount;

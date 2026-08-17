@@ -5,18 +5,23 @@ on:
     branches:
       - main
 
-permissions:
-  contents: write
+permissions: {}
 
 concurrency:
   group: nightly-release
   cancel-in-progress: false
 
 jobs:
-  release:
-    name: Package and publish nightly
+  package:
+    name: Package nightly
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    permissions:
+      contents: read
+    outputs:
+      archive: ${{ steps.release.outputs.archive }}
+      target_sha: ${{ steps.release.outputs.target_sha }}
+      version: ${{ steps.release.outputs.version }}
 
     steps:
       - name: Check out pushed commit
@@ -48,6 +53,7 @@ jobs:
           {
             echo "version=$version"
             echo "archive=SEpedia-nightly.zip"
+            echo "target_sha=$GITHUB_SHA"
           } >> "$GITHUB_OUTPUT"
 
       - name: Assemble Workshop-ready package
@@ -55,15 +61,43 @@ jobs:
         run: |
           ./scripts/package.sh \
             --stage "$RUNNER_TEMP/package" \
-            --archive "$GITHUB_WORKSPACE/artifacts/${{ steps.release.outputs.archive }}"
+            --archive "$RUNNER_TEMP/release/${{ steps.release.outputs.archive }}"
+
+      - name: Upload nightly handoff artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: nightly-release-${{ github.run_id }}
+          path: ${{ runner.temp }}/release
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
+
+  github_release:
+    name: Publish GitHub nightly release
+    needs: package
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download nightly handoff artifact
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
+        with:
+          name: nightly-release-${{ github.run_id }}
+          path: ${{ runner.temp }}/release
 
       - name: Publish GitHub nightly release
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_ARCHIVE: ${{ steps.release.outputs.archive }}
-          RELEASE_VERSION: ${{ steps.release.outputs.version }}
+          RELEASE_ARCHIVE: ${{ needs.package.outputs.archive }}
+          RELEASE_VERSION: ${{ needs.package.outputs.version }}
+          TARGET_SHA: ${{ needs.package.outputs.target_sha }}
         shell: bash
         run: |
+          cd -- "$RUNNER_TEMP/release"
+          sha256sum --check "$RELEASE_ARCHIVE.sha256"
+
           notes=$(cat <<EOF
           > [!WARNING]
           > This is an automated GitHub-only nightly build. It has not been published to Steam Workshop and may be unstable.
@@ -82,9 +116,9 @@ jobs:
           )
 
           gh release create "$RELEASE_VERSION" \
-            "artifacts/${RELEASE_ARCHIVE}#Workshop-ready mod archive" \
-            "artifacts/${RELEASE_ARCHIVE}.sha256#SHA-256 checksum" \
-            --target "$GITHUB_SHA" \
+            "$RELEASE_ARCHIVE#Workshop-ready mod archive" \
+            "$RELEASE_ARCHIVE.sha256#SHA-256 checksum" \
+            --target "$TARGET_SHA" \
             --title "nightly" \
             --notes "$notes" \
             --generate-notes \

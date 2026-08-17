@@ -24,6 +24,7 @@ namespace SEpedia
         private SEpediaFrontend frontend;
         private int tick;
         private int nextBuildAttempt;
+        private bool refreshRequested;
         private bool uiWarningLogged;
         private bool unloading;
 
@@ -39,12 +40,14 @@ namespace SEpedia
             nextBuildAttempt = 0;
             definitionIndex = null;
             celestialIndex = null;
+            refreshRequested = false;
             unloading = false;
             uiWarningLogged = false;
 
             if (!MyAPIGateway.Utilities.IsDedicated)
             {
                 frontend = new SEpediaFrontend();
+                frontend.RefreshRequested += OnRefreshRequested;
                 try
                 {
                     RichHudClient.Init("SEpedia", OnRichHudReady, OnRichHudReset);
@@ -62,7 +65,7 @@ namespace SEpedia
         {
             tick++;
 
-            if (definitionIndex == null && tick >= nextBuildAttempt)
+            if ((definitionIndex == null || refreshRequested) && tick >= nextBuildAttempt)
                 TryBuildIndex();
 
             if (frontend != null && tick % BindingPollTicks == 0)
@@ -87,6 +90,7 @@ namespace SEpedia
 
             if (frontend != null)
             {
+                frontend.RefreshRequested -= OnRefreshRequested;
                 frontend.Close();
                 frontend = null;
             }
@@ -123,19 +127,26 @@ namespace SEpedia
 
                 if (!MyAPIGateway.Utilities.IsDedicated)
                 {
+                    CelestialIndex refreshedCelestial = null;
                     try
                     {
-                        celestialIndex = new CelestialIndex(built, SEpediaLog.Warning);
-                        celestialIndex.Changed += OnCelestialChanged;
-                        celestialIndex.Initialize();
-                    }
-                    catch (Exception exception)
-                    {
+                        refreshedCelestial = new CelestialIndex(built, SEpediaLog.Warning);
+                        refreshedCelestial.Changed += OnCelestialChanged;
+                        refreshedCelestial.Initialize();
+
                         if (celestialIndex != null)
                         {
                             celestialIndex.Changed -= OnCelestialChanged;
                             celestialIndex.Close();
-                            celestialIndex = null;
+                        }
+                        celestialIndex = refreshedCelestial;
+                    }
+                    catch (Exception exception)
+                    {
+                        if (refreshedCelestial != null)
+                        {
+                            refreshedCelestial.Changed -= OnCelestialChanged;
+                            refreshedCelestial.Close();
                         }
                         SEpediaLog.Error("Celestial entity tracking could not be initialized; definition browsing remains available.", exception);
                     }
@@ -149,6 +160,7 @@ namespace SEpedia
 
                 if (frontend != null)
                     frontend.AttachIndex(built, celestialIndex, survivalMode);
+                refreshRequested = false;
             }
             catch (Exception exception)
             {
@@ -163,6 +175,11 @@ namespace SEpedia
         #endregion
 
         #region Rich HUD and Entity Events
+
+        private void OnRefreshRequested()
+        {
+            refreshRequested = true;
+        }
 
         private void OnRichHudReady()
         {

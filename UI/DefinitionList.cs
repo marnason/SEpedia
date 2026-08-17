@@ -18,6 +18,7 @@ namespace SEpedia.UI
 
         private readonly DefinitionIndex definitions;
         private readonly CatalogFilter filter;
+        private readonly bool survivalMode;
         private readonly CategoryBar categoryBar;
         private readonly ListBox<CatalogEntry> list;
         private readonly PagerRow pager;
@@ -64,10 +65,12 @@ namespace SEpedia.UI
             DefinitionIndex definitions,
             CatalogFilter filter,
             IEnumerable<PlanetSnapshot> planets,
+            bool survivalMode,
             HudParentBase parent = null) : base(parent)
         {
             this.definitions = definitions;
             this.filter = filter;
+            this.survivalMode = survivalMode;
             catalog = new CatalogIndex(definitions, planets);
             pendingRevealIndex = -1;
             revealLayoutReady = false;
@@ -161,6 +164,7 @@ namespace SEpedia.UI
                 CollectionContainer = { filterRow, { list, 1f }, pager.Root, status }
             };
 
+            RefreshCategoryAvailability();
             Refresh();
         }
 
@@ -248,7 +252,16 @@ namespace SEpedia.UI
         public void RebuildCatalog(IEnumerable<PlanetSnapshot> planets)
         {
             catalog = new CatalogIndex(definitions, planets);
+            RefreshCategoryAvailability();
             Refresh();
+        }
+
+        private void RefreshCategoryAvailability()
+        {
+            categoryBar.UpdateAvailability(delegate(BrowseCategory category)
+            {
+                return catalog.HasMultipleDefaultEntries(category, survivalMode);
+            });
         }
 
         #endregion

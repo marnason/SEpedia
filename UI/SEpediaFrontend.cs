@@ -8,6 +8,8 @@ namespace SEpedia.UI
     {
         #region State
 
+        public event Action RefreshRequested;
+
         private BindingConfigController bindings;
         private EncyclopediaWindow window;
         private DefinitionIndex index;
@@ -63,12 +65,23 @@ namespace SEpedia.UI
 
         public void AttachIndex(DefinitionIndex definitionIndex, CelestialIndex celestialIndex, bool isSurvivalMode)
         {
+            bool replaceWindow = window != null &&
+                (index != definitionIndex || celestial != celestialIndex || survivalMode != isSurvivalMode);
+            bool reopen = replaceWindow && window.Visible;
+            if (replaceWindow)
+            {
+                window.Close();
+                window = null;
+            }
+
             index = definitionIndex;
             celestial = celestialIndex;
             survivalMode = isSurvivalMode;
             if (filter == null)
                 filter = new CatalogFilter(survivalMode);
             TryCreateWindow();
+            if (reopen && window != null)
+                window.Toggle();
         }
 
         public void RefreshCelestial()
@@ -116,7 +129,16 @@ namespace SEpedia.UI
         private void OnToggleRequested()
         {
             if (window != null)
+            {
+                bool opening = !window.Visible;
                 window.Toggle();
+                if (opening)
+                {
+                    Action handler = RefreshRequested;
+                    if (handler != null)
+                        handler();
+                }
+            }
             else
                 pendingOpen = true;
         }
