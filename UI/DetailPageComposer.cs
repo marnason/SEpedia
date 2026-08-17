@@ -209,7 +209,7 @@ namespace SEpedia.UI
                 RecipeDocument recipe = recipes[index];
                 MyFixedPoint amount = GetAmount(consumed ? recipe.Prerequisites : recipe.Results, itemId);
                 items.Add(new DetailItem(
-                    FormatAmount(amount, itemId) + GetDefinitionName(itemId),
+                    GetDefinitionName(recipe.DefinitionId) + " — " + FormatAmount(amount, itemId).TrimEnd(),
                     recipe.DefinitionId,
                     BuildRecipeToolTip(recipe)));
             }

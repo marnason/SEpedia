@@ -15,6 +15,7 @@ MUST and MUST NOT are requirements. SHOULD is the default unless repository evid
 
 - Keep backend state independent of Rich HUD types. All game integration MUST use the public Space Engineers ModAPI; do not add plugins, patching, reflection into internals, external services, or custom infrastructure without approval.
 - Recipe indexing MUST enumerate `MyDefinitionManager.GetBlueprintDefinitions()` explicitly because `GetAllDefinitions()` omits blueprints.
+- Generated assembler block-component bundles are runtime composite blueprints whose IDs mirror cube-block definition IDs; they are not `MyBlockBlueprintDefinition` instances. Exclude them from recipe browsing and relationships by matching loaded cube-block IDs rather than guessing from the runtime type name.
 - Player-facing UI MUST use Rich HUD Master. Treat it as an optional client dependency, never initialize it on dedicated servers, and release registrations on reset and unload.
 - Check the maintained [Rich HUD client documentation](https://zachhembree.github.io/RichHudFramework.Client/index.html), [official example](https://github.com/ZachHembree/TextEditorExample), and matching vendored implementation before changing version-sensitive integration.
 - Definition-supplied icons MUST NOT be collected, resolved, packaged, or rendered. Headers remain text-only unless the user approves a new direction.
@@ -31,6 +32,7 @@ MUST and MUST NOT are requirements. SHOULD is the default unless repository evid
 
 - Begin code or project verification with `scripts/verify.sh` and treat MDK warnings and errors as build failures. Confirm generated output and machine-local `mdk.local.ini` variants remain ignored and untracked.
 - Use `scripts/deploy.sh` after every implementation change. Do not inspect deployed contents unless the user explicitly requests it or deployment reports a failure. Report runtime checks that cannot be performed.
+- When testing the locally deployed mod, keep Rich HUD Master explicitly enabled in the save; a local mod does not inherit the Workshop item's dependency list. Before reporting UI runtime results, confirm the log records `[SEpedia] Rich HUD interface initialized` rather than the unavailable-dependency warning.
 - UI, lifecycle, multiplayer, dedicated-server, or runtime-indexing changes require proportionate in-game verification. For Rich HUD changes, test text entry, gameplay-input suppression, vanilla-HUD overlap/restoration, reset, unload, and minimum/default/large layouts.
 - Before an experiment that can mutate live definition or session state, disable autosave or use a disposable save. Stop without saving on any integrity failure and restore the save before retrying.
 - When mirroring a vanilla menu, use its actual runtime eligibility semantics and confirm every browse category receives a vanilla entry.

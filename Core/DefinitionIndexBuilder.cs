@@ -75,6 +75,7 @@ namespace SEpedia.Core
         {
             var definitions = new List<MyDefinitionBase>();
             var ids = new HashSet<MyDefinitionId>();
+            var blockBlueprintIds = new HashSet<MyDefinitionId>();
 
             try
             {
@@ -82,7 +83,15 @@ namespace SEpedia.Core
                 {
                     definitions.Add(definition);
                     if (definition != null)
+                    {
                         ids.Add(definition.Id);
+                        if (definition is MyCubeBlockDefinition)
+                        {
+                            blockBlueprintIds.Add(new MyDefinitionId(
+                                typeof(MyObjectBuilder_BlueprintDefinition),
+                                definition.Id.ToString().Replace("MyObjectBuilder_", string.Empty)));
+                        }
+                    }
                 }
             }
             catch (Exception exception)
@@ -99,7 +108,7 @@ namespace SEpedia.Core
                 // GetAllDefinitions() in the game runtime.
                 foreach (MyBlueprintDefinitionBase blueprint in manager.GetBlueprintDefinitions())
                 {
-                    if (blueprint != null && ids.Add(blueprint.Id))
+                    if (blueprint != null && !blockBlueprintIds.Contains(blueprint.Id) && ids.Add(blueprint.Id))
                         definitions.Add(blueprint);
                 }
             }
