@@ -115,6 +115,7 @@ namespace SEpedia.UI
                 if (!visible)
                 {
                     slot.InputEnabled = false;
+                    slot.MouseInput.ToolTip = null;
                     continue;
                 }
 
@@ -126,6 +127,9 @@ namespace SEpedia.UI
                         ? GlyphFormat.Blueish.WithStyle(FontStyles.Underline).WithSize(.88f)
                         : GlyphFormat.White.WithSize(.82f));
                 slot.InputEnabled = linked;
+                slot.MouseInput.ToolTip = string.IsNullOrWhiteSpace(item.ToolTip)
+                    ? null
+                    : item.ToolTip;
             }
         }
 

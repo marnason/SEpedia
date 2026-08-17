@@ -14,11 +14,13 @@ namespace SEpedia.UI
     {
         public string Text { get; private set; }
         public MyDefinitionId? LinkId { get; private set; }
+        public string ToolTip { get; private set; }
 
-        public DetailItem(string text, MyDefinitionId? linkId = null)
+        public DetailItem(string text, MyDefinitionId? linkId = null, string toolTip = null)
         {
             Text = text ?? string.Empty;
             LinkId = linkId;
+            ToolTip = toolTip ?? string.Empty;
         }
     }
 

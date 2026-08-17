@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using VRage.Game;
 using VRageMath;
@@ -148,8 +149,12 @@ namespace SEpedia.Core
     {
         #region State
 
+        private static readonly char[] LineSeparators =
+            { '\r', '\n', '\u0085', '\u2028', '\u2029' };
+
         public MyDefinitionId Id { get; private set; }
-        public string DisplayName { get; private set; }
+        public string AuthoredDisplayName { get; private set; }
+        public string UiDisplayName { get; private set; }
         public string Description { get; private set; }
         public string RuntimeTypeName { get; private set; }
         public BrowseCategory BrowseCategory { get; private set; }
@@ -174,7 +179,7 @@ namespace SEpedia.Core
 
         public DefinitionDocument(
             MyDefinitionId id,
-            string displayName,
+            string authoredDisplayName,
             string description,
             string runtimeTypeName,
             BrowseCategory browseCategory,
@@ -189,7 +194,8 @@ namespace SEpedia.Core
             AsteroidGeneratorData asteroidGenerator)
         {
             Id = id;
-            DisplayName = displayName;
+            AuthoredDisplayName = authoredDisplayName ?? string.Empty;
+            UiDisplayName = GetFirstAuthoredLine(AuthoredDisplayName, id);
             Description = description;
             RuntimeTypeName = runtimeTypeName;
             BrowseCategory = browseCategory;
@@ -202,6 +208,25 @@ namespace SEpedia.Core
             CubeBlock = cubeBlock;
             PlanetGenerator = planetGenerator;
             AsteroidGenerator = asteroidGenerator;
+        }
+
+        #endregion
+
+        #region Display Names
+
+        private static string GetFirstAuthoredLine(string displayName, MyDefinitionId id)
+        {
+            string[] lines = displayName.Split(LineSeparators, StringSplitOptions.RemoveEmptyEntries);
+            for (int index = 0; index < lines.Length; index++)
+            {
+                string line = lines[index].Trim();
+                if (line.Length > 0)
+                    return line;
+            }
+
+            return !string.IsNullOrWhiteSpace(id.SubtypeName)
+                ? id.SubtypeName
+                : id.ToString();
         }
 
         #endregion

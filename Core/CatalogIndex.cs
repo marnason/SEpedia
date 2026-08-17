@@ -70,6 +70,7 @@ namespace SEpedia.Core
                 Blob = string.Join(" ", new[]
                 {
                     name,
+                    entry.Definition != null ? Normalize(entry.Definition.AuthoredDisplayName) : string.Empty,
                     normalizedSubtype,
                     Normalize(id),
                     Normalize(category),

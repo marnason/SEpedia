@@ -58,14 +58,6 @@ namespace SEpedia.Core
 
         #region Recipe Text
 
-        public static string BuildRecipeSummary(RecipeDocument recipe, DefinitionIndex definitions)
-        {
-            if (recipe == null)
-                return "Recipe";
-            return JoinItemNames(recipe.Prerequisites, definitions, 2) + " → " +
-                JoinItemNames(recipe.Results, definitions, 2);
-        }
-
         public static string BuildRecipeSearchBlob(RecipeDocument recipe, DefinitionIndex definitions)
         {
             var builder = new StringBuilder();
@@ -73,30 +65,6 @@ namespace SEpedia.Core
             AppendDefinitions(builder, recipe.Results, definitions);
             for (int index = 0; index < recipe.ProductionBlocks.Count; index++)
                 AppendDefinition(builder, recipe.ProductionBlocks[index], definitions);
-            return builder.ToString();
-        }
-
-        private static string JoinItemNames(
-            IReadOnlyList<DefinitionAmount> amounts,
-            DefinitionIndex definitions,
-            int limit)
-        {
-            if (amounts.Count == 0)
-                return "None";
-
-            var builder = new StringBuilder();
-            int count = Math.Min(amounts.Count, limit);
-            for (int index = 0; index < count; index++)
-            {
-                if (builder.Length > 0)
-                    builder.Append(" + ");
-                DefinitionDocument item;
-                builder.Append(definitions.TryGet(amounts[index].DefinitionId, out item)
-                    ? item.DisplayName
-                    : amounts[index].DefinitionId.SubtypeName);
-            }
-            if (amounts.Count > limit)
-                builder.Append(" + …");
             return builder.ToString();
         }
 
@@ -116,7 +84,11 @@ namespace SEpedia.Core
         {
             DefinitionDocument definition;
             if (definitions.TryGet(id, out definition))
-                builder.Append(' ').Append(definition.DisplayName).Append(' ').Append(definition.SubtypeName);
+            {
+                builder.Append(' ').Append(definition.UiDisplayName)
+                    .Append(' ').Append(definition.AuthoredDisplayName)
+                    .Append(' ').Append(definition.SubtypeName);
+            }
             builder.Append(' ').Append(id);
         }
 

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Text;
 using SEpedia.Core;
 using VRage;
 using VRage.Game;
@@ -47,7 +48,7 @@ namespace SEpedia.UI
             AddReverseRelationships(rows, definition.Id);
 
             return new DetailPageModel(
-                definition.DisplayName,
+                definition.UiDisplayName,
                 definition.Id.ToString(),
                 definition.RuntimeTypeName,
                 definition.Description,
@@ -207,12 +208,42 @@ namespace SEpedia.UI
             {
                 RecipeDocument recipe = recipes[index];
                 MyFixedPoint amount = GetAmount(consumed ? recipe.Prerequisites : recipe.Results, itemId);
-                DetailItem item = CreateDefinitionItem(recipe.DefinitionId, FormatAmount(amount, itemId));
-                if (item.LinkId.HasValue)
-                    item = new DetailItem(item.Text + " — " + CatalogText.BuildRecipeSummary(recipe, this.index), item.LinkId);
-                items.Add(item);
+                items.Add(new DetailItem(
+                    FormatAmount(amount, itemId) + GetDefinitionName(itemId),
+                    recipe.DefinitionId,
+                    BuildRecipeToolTip(recipe)));
             }
             return items;
+        }
+
+        private string BuildRecipeToolTip(RecipeDocument recipe)
+        {
+            var builder = new StringBuilder();
+            builder.Append("Recipe: ").Append(GetDefinitionName(recipe.DefinitionId));
+            AppendRecipeAmounts(builder, "Inputs", recipe.Prerequisites);
+            AppendRecipeAmounts(builder, "Outputs", recipe.Results);
+            return builder.ToString();
+        }
+
+        private void AppendRecipeAmounts(
+            StringBuilder builder,
+            string heading,
+            IReadOnlyList<DefinitionAmount> amounts)
+        {
+            builder.Append("\n\n").Append(heading);
+            if (amounts.Count == 0)
+            {
+                builder.Append("\nNone");
+                return;
+            }
+
+            for (int index = 0; index < amounts.Count; index++)
+            {
+                DefinitionAmount amount = amounts[index];
+                builder.Append('\n')
+                    .Append(FormatAmount(amount.Amount, amount.DefinitionId))
+                    .Append(GetDefinitionName(amount.DefinitionId));
+            }
         }
 
         private List<DetailItem> CreateAmountItems(IReadOnlyList<DefinitionAmount> amounts)
@@ -246,7 +277,7 @@ namespace SEpedia.UI
                     continue;
                 }
                 string grid = block.CubeBlock != null ? " — " + block.CubeBlock.CubeSize + " grid" : string.Empty;
-                items.Add(new DetailItem(block.DisplayName + grid, block.Id));
+                items.Add(new DetailItem(block.UiDisplayName + grid, block.Id));
             }
             return items;
         }
@@ -256,7 +287,15 @@ namespace SEpedia.UI
             DefinitionDocument target;
             if (!index.TryGet(definitionId, out target))
                 return new DetailItem(prefix + definitionId + " (definition unavailable)");
-            return new DetailItem(prefix + target.DisplayName, definitionId);
+            return new DetailItem(prefix + target.UiDisplayName, definitionId);
+        }
+
+        private string GetDefinitionName(MyDefinitionId definitionId)
+        {
+            DefinitionDocument definition;
+            return index.TryGet(definitionId, out definition)
+                ? definition.UiDisplayName
+                : definitionId + " (definition unavailable)";
         }
 
         private string FormatAmount(MyFixedPoint amount, MyDefinitionId itemId)

@@ -63,7 +63,7 @@ namespace SEpedia.Core
         {
             Definition = definition;
             Category = definition.BrowseCategory;
-            DisplayName = definition.DisplayName;
+            DisplayName = definition.UiDisplayName;
             StableKey = "definition:" + definition.Id;
             CelestialSortOrder = celestialSortOrder;
         }

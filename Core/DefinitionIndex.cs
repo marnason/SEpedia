@@ -100,10 +100,10 @@ namespace SEpedia.Core
             DefinitionDocument leftDefinition;
             DefinitionDocument rightDefinition;
             string leftName = byId.TryGetValue(left.BlockId, out leftDefinition)
-                ? leftDefinition.DisplayName
+                ? leftDefinition.UiDisplayName
                 : left.BlockId.ToString();
             string rightName = byId.TryGetValue(right.BlockId, out rightDefinition)
-                ? rightDefinition.DisplayName
+                ? rightDefinition.UiDisplayName
                 : right.BlockId.ToString();
             return string.Compare(leftName, rightName, System.StringComparison.OrdinalIgnoreCase);
         }
@@ -111,8 +111,8 @@ namespace SEpedia.Core
         private static int CompareDefinitions(DefinitionDocument left, DefinitionDocument right)
         {
             int name = string.Compare(
-                left.DisplayName,
-                right.DisplayName,
+                left.UiDisplayName,
+                right.UiDisplayName,
                 System.StringComparison.OrdinalIgnoreCase);
             return name != 0
                 ? name
