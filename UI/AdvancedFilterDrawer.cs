@@ -43,9 +43,11 @@ namespace SEpedia.UI
                 DimAlignment = DimAlignments.UnpaddedSize,
                 SizingMode = HudChainSizingModes.FitMembersOffAxis,
                 Padding = new Vector2(7f),
-                Spacing = 3f,
+                Spacing = 7f,
                 UseSmoothScrolling = true
             };
+
+            var definitionSection = new FilterSectionPanel(content);
 
             var reset = new LabelBoxButton
             {
@@ -72,7 +74,7 @@ namespace SEpedia.UI
                 Height = 30f,
                 AutoResize = false,
                 VertCenterText = true,
-                Padding = new Vector2(4f, 0f)
+                Padding = new Vector2(12f, 0f)
             };
             var definitionHeader = new HudChain(false)
             {
@@ -82,16 +84,20 @@ namespace SEpedia.UI
             };
             definitionHeader.Add(definitionHeading, 1f);
             definitionHeader.Add(reset);
-            AddRow(definitionHeader);
+            definitionSection.Add(definitionHeader);
 
-            enabledFilter = AddTriState("Enabled", delegate(TriStateFilter value) { filter.EnabledState = value; });
-            publicFilter = AddTriState("Public", delegate(TriStateFilter value) { filter.PublicState = value; });
-            survivalFilter = AddTriState("Survival", delegate(TriStateFilter value) { filter.SurvivalState = value; });
+            enabledFilter = AddTriState(definitionSection, "Enabled", delegate(TriStateFilter value) { filter.EnabledState = value; });
+            publicFilter = AddTriState(definitionSection, "Public", delegate(TriStateFilter value) { filter.PublicState = value; });
+            survivalFilter = AddTriState(definitionSection, "Survival", delegate(TriStateFilter value) { filter.SurvivalState = value; });
 
-            buildMenuFilter = AddTriState("Listed in G menu", delegate(TriStateFilter value) { filter.BuildMenuState = value; }, blockOnlyEntries);
-            AddRow(CreateHeading("Grid size"), blockOnlyEntries);
-            smallGrid = AddGridSize("Small", MyCubeSize.Small);
-            largeGrid = AddGridSize("Large", MyCubeSize.Large);
+            var availabilitySection = new FilterSectionPanel(content, blockOnlyEntries);
+            availabilitySection.Add(CreateHeading("Block availability"));
+            buildMenuFilter = AddTriState(availabilitySection, "Listed in G menu", delegate(TriStateFilter value) { filter.BuildMenuState = value; });
+
+            var gridSection = new FilterSectionPanel(content, blockOnlyEntries);
+            gridSection.Add(CreateHeading("Grid size"));
+            smallGrid = AddGridSize(gridSection, "Small", MyCubeSize.Small);
+            largeGrid = AddGridSize(gridSection, "Large", MyCubeSize.Large);
 
             blockTypes = new PagedFacetSection(
                 content,
@@ -152,15 +158,15 @@ namespace SEpedia.UI
         #region Control Construction
 
         private Dropdown<TriStateFilter> AddTriState(
+            FilterSectionPanel section,
             string name,
-            Action<TriStateFilter> setValue,
-            IList<ScrollBoxEntry> group = null)
+            Action<TriStateFilter> setValue)
         {
             var dropdown = new Dropdown<TriStateFilter>
             {
                 Height = 34f,
                 Format = GlyphFormat.White.WithSize(.76f),
-                MemberPadding = new Vector2(8f, 2f),
+                MemberPadding = new Vector2(16f, 2f),
                 LineHeight = 25f,
                 DropdownHeight = 78f
             };
@@ -175,11 +181,14 @@ namespace SEpedia.UI
                     RaiseChanged();
                 }
             };
-            AddRow(dropdown, group);
+            section.Add(dropdown);
             return dropdown;
         }
 
-        private NamedCheckBox AddGridSize(string name, MyCubeSize size)
+        private NamedCheckBox AddGridSize(
+            FilterSectionPanel section,
+            string name,
+            MyCubeSize size)
         {
             NamedCheckBox checkBox = CreateCheckBox(name, filter.SelectedGridSizes.Contains(size));
             checkBox.MouseInput.LeftClicked += delegate
@@ -199,7 +208,7 @@ namespace SEpedia.UI
 
                 RaiseChanged();
             };
-            AddRow(checkBox, blockOnlyEntries);
+            section.Add(checkBox);
             return checkBox;
         }
 
@@ -211,6 +220,7 @@ namespace SEpedia.UI
                 Height = 27f,
                 AutoResize = false,
                 VertCenterText = true,
+                TextPadding = new Vector2(16f, 0f),
                 Value = value
             };
         }
@@ -223,18 +233,8 @@ namespace SEpedia.UI
                 Height = 28f,
                 AutoResize = false,
                 VertCenterText = true,
-                Padding = new Vector2(4f, 4f)
+                Padding = new Vector2(12f, 4f)
             };
-        }
-
-        private ScrollBoxEntry AddRow(HudElementBase row, IList<ScrollBoxEntry> group = null)
-        {
-            var entry = new ScrollBoxEntry();
-            entry.SetElement(row);
-            content.Add(entry);
-            if (group != null)
-                group.Add(entry);
-            return entry;
         }
 
         #endregion

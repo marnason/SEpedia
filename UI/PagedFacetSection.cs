@@ -13,13 +13,11 @@ namespace SEpedia.UI
         private sealed class Slot
         {
             public readonly NamedCheckBox CheckBox;
-            public readonly ScrollBoxEntry Entry;
             public FacetCount Facet;
 
-            public Slot(NamedCheckBox checkBox, ScrollBoxEntry entry)
+            public Slot(NamedCheckBox checkBox)
             {
                 CheckBox = checkBox;
-                Entry = entry;
             }
         }
 
@@ -30,13 +28,11 @@ namespace SEpedia.UI
         private readonly HashSet<string> selected;
         private readonly bool showKeyToolTips;
         private readonly Action changed;
+        private readonly FilterSectionPanel section;
         private readonly Label heading;
         private readonly NamedCheckBox all;
-        private readonly ScrollBoxEntry headingEntry;
-        private readonly ScrollBoxEntry allEntry;
         private readonly Slot[] slots;
         private readonly PagerRow pager;
-        private readonly ScrollBoxEntry pagerEntry;
         private IReadOnlyList<FacetCount> facets;
 
         #endregion
@@ -57,9 +53,10 @@ namespace SEpedia.UI
             this.showKeyToolTips = showKeyToolTips;
             this.changed = changed;
             facets = EmptyFacets;
+            section = new FilterSectionPanel(content, group);
 
             heading = CreateHeading(headingText);
-            headingEntry = AddRow(content, heading, group);
+            section.Add(heading);
 
             all = CreateCheckBox(allText, true);
             all.MouseInput.LeftClicked += delegate
@@ -74,13 +71,14 @@ namespace SEpedia.UI
                     all.Value = true;
                 }
             };
-            allEntry = AddRow(content, all, group);
+            section.Add(all);
 
-            slots = new Slot[UiTheme.BoundedPageSize];
+            slots = new Slot[UiTheme.AdvancedFilterPageSize];
             for (int index = 0; index < slots.Length; index++)
             {
                 NamedCheckBox checkBox = CreateCheckBox(string.Empty, false);
-                var slot = new Slot(checkBox, AddRow(content, checkBox, group));
+                var slot = new Slot(checkBox);
+                section.Add(checkBox);
                 slots[index] = slot;
                 Slot capturedSlot = slot;
                 checkBox.MouseInput.LeftClicked += delegate
@@ -96,7 +94,7 @@ namespace SEpedia.UI
             }
 
             pager = new PagerRow(UpdateVisibleSlots);
-            pagerEntry = AddRow(content, pager.Root, group);
+            section.Add(pager.Root);
         }
 
         #endregion
@@ -106,24 +104,19 @@ namespace SEpedia.UI
         public void Update(IReadOnlyList<FacetCount> newFacets, bool enabled)
         {
             facets = newFacets ?? EmptyFacets;
-            pager.Configure(facets.Count, UiTheme.BoundedPageSize);
+            pager.Configure(facets.Count, UiTheme.AdvancedFilterPageSize);
             SetEnabled(enabled);
             UpdateVisibleSlots();
         }
 
-        public void SetEnabled(bool enabled)
+        public void SetEnabled(bool value)
         {
-            headingEntry.Enabled = enabled;
-            allEntry.Enabled = enabled;
-            for (int index = 0; index < slots.Length; index++)
-                slots[index].Entry.Enabled = enabled && slots[index].Facet != null;
-            pagerEntry.Enabled = enabled && pager.Root.Visible;
+            section.Entry.Enabled = value;
         }
 
         private void UpdateVisibleSlots()
         {
-            bool enabled = headingEntry.Enabled;
-            int start = pager.Page * UiTheme.BoundedPageSize;
+            int start = pager.Page * UiTheme.AdvancedFilterPageSize;
             heading.Text = new RichText(
                 selected.Count == 0 ? headingText : headingText + " (" + selected.Count + " selected)",
                 GlyphFormat.Blueish.WithSize(.88f));
@@ -134,7 +127,7 @@ namespace SEpedia.UI
                 Slot slot = slots[index];
                 int facetIndex = start + index;
                 slot.Facet = facetIndex < facets.Count ? facets[facetIndex] : null;
-                slot.Entry.Enabled = enabled && slot.Facet != null;
+                slot.CheckBox.Visible = slot.Facet != null;
                 if (slot.Facet == null)
                 {
                     slot.CheckBox.Name = new RichText(string.Empty, GlyphFormat.White.WithSize(.72f));
@@ -150,25 +143,11 @@ namespace SEpedia.UI
                     slot.CheckBox.MouseInput.ToolTip = showKeyToolTips ? slot.Facet.Key : null;
                 }
             }
-            pagerEntry.Enabled = enabled && pager.Root.Visible;
         }
 
         #endregion
 
         #region Control Factories
-
-        private static ScrollBoxEntry AddRow(
-            ScrollBox content,
-            HudElementBase row,
-            IList<ScrollBoxEntry> group)
-        {
-            var entry = new ScrollBoxEntry();
-            entry.SetElement(row);
-            content.Add(entry);
-            if (group != null)
-                group.Add(entry);
-            return entry;
-        }
 
         private static NamedCheckBox CreateCheckBox(string name, bool value)
         {
@@ -178,6 +157,7 @@ namespace SEpedia.UI
                 Height = UiTheme.StandardRowHeight,
                 AutoResize = false,
                 VertCenterText = true,
+                TextPadding = new VRageMath.Vector2(16f, 0f),
                 Value = value
             };
         }
@@ -190,7 +170,7 @@ namespace SEpedia.UI
                 Height = 28f,
                 AutoResize = false,
                 VertCenterText = true,
-                Padding = new VRageMath.Vector2(4f, 4f)
+                Padding = new VRageMath.Vector2(12f, 4f)
             };
         }
 

@@ -56,6 +56,12 @@ namespace SEpedia.UI
             UpdateVisuals();
         }
 
+        public void Reset()
+        {
+            Page = 0;
+            UpdateVisuals();
+        }
+
         private void Move(int delta)
         {
             int target = Math.Max(0, Math.Min(Page + delta, pageCount - 1));

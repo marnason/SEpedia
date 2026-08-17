@@ -11,8 +11,6 @@ namespace SEpedia.UI
     {
         #region State
 
-        private const int ResultLimit = 500;
-
         public event Action<CatalogEntry> SelectionChanged;
         public event Action FilterRequested;
         public event Action ResultsChanged;
@@ -21,6 +19,7 @@ namespace SEpedia.UI
         private readonly CatalogFilter filter;
         private readonly CategoryBar categoryBar;
         private readonly ListBox<CatalogEntry> list;
+        private readonly PagerRow pager;
         private readonly Label status;
         private CatalogIndex catalog;
         private CatalogResult currentResults;
@@ -72,7 +71,7 @@ namespace SEpedia.UI
                 Height = 29f,
                 AutoResize = false,
                 VertCenterText = true,
-                TextPadding = Vector2.Zero,
+                TextPadding = new Vector2(16f, 0f),
                 Color = UiTheme.Panel,
                 HighlightColor = UiTheme.PanelHighlight
             };
@@ -92,6 +91,8 @@ namespace SEpedia.UI
                 UpdateValueCallback = OnSelectionChanged
             };
 
+            pager = new PagerRow(RefreshPage);
+
             status = new Label
             {
                 Height = 24f,
@@ -106,7 +107,7 @@ namespace SEpedia.UI
                 DimAlignment = DimAlignments.UnpaddedSize,
                 SizingMode = HudChainSizingModes.FitMembersOffAxis,
                 Spacing = 2f,
-                CollectionContainer = { filterButton, { list, 1f }, status }
+                CollectionContainer = { filterButton, { list, 1f }, pager.Root, status }
             };
 
             Refresh();
@@ -124,14 +125,27 @@ namespace SEpedia.UI
 
         public void Refresh()
         {
+            pager.Reset();
+            RefreshResults();
+        }
+
+        private void RefreshPage()
+        {
+            RefreshResults();
+        }
+
+        private void RefreshResults()
+        {
             string previousKey = list.Value != null && list.Value.AssocMember != null
                 ? list.Value.AssocMember.StableKey
                 : string.Empty;
 
             filter.NormalizeForCategory();
-            currentResults = catalog.Query(filter, ResultLimit);
+            int offset = pager.Page * UiTheme.CatalogPageSize;
+            currentResults = catalog.Query(filter, offset, UiTheme.CatalogPageSize);
             if (filter.ReconcileAvailableFacets(currentResults.Sources, currentResults.BlockTypes))
-                currentResults = catalog.Query(filter, ResultLimit);
+                currentResults = catalog.Query(filter, offset, UiTheme.CatalogPageSize);
+            pager.Configure(currentResults.TotalCount, UiTheme.CatalogPageSize);
             updating = true;
             try
             {
@@ -156,8 +170,10 @@ namespace SEpedia.UI
             }
 
             string categoryName = CatalogText.GetCategoryName(filter.Category).ToLowerInvariant();
-            status.Text = currentResults.TotalCount > currentResults.Items.Count
-                ? "Showing " + currentResults.Items.Count + " of " + currentResults.TotalCount + " " + categoryName
+            int first = pager.Page * UiTheme.CatalogPageSize + 1;
+            int last = pager.Page * UiTheme.CatalogPageSize + currentResults.Items.Count;
+            status.Text = currentResults.TotalCount > UiTheme.CatalogPageSize
+                ? "Showing " + first + "–" + last + " of " + currentResults.TotalCount + " " + categoryName
                 : currentResults.TotalCount + " " + categoryName;
 
             if (list.Value != null)

@@ -95,7 +95,7 @@ namespace SEpedia.Core
 
         #region Catalog Queries
 
-        public CatalogResult Query(CatalogFilter filter, int limit)
+        public CatalogResult Query(CatalogFilter filter, int offset, int limit)
         {
             if (filter == null)
                 throw new ArgumentNullException("filter");
@@ -124,10 +124,11 @@ namespace SEpedia.Core
             }
 
             matches.Sort(CompareScored);
-            int count = Math.Min(Math.Max(0, limit), matches.Count);
+            int first = Math.Min(Math.Max(0, offset), matches.Count);
+            int count = Math.Min(Math.Max(0, limit), matches.Count - first);
             var result = new List<CatalogEntry>(count);
             for (int index = 0; index < count; index++)
-                result.Add(matches[index].Entry);
+                result.Add(matches[first + index].Entry);
 
             return new CatalogResult(result, matches.Count, sources, blockTypes);
         }

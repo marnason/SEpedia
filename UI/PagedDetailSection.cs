@@ -52,7 +52,7 @@ namespace SEpedia.UI
             };
             Root.Add(heading);
 
-            slots = new LabelButton[UiTheme.BoundedPageSize];
+            slots = new LabelButton[UiTheme.DetailSectionPageSize];
             for (int index = 0; index < slots.Length; index++)
             {
                 var slot = new LabelButton
@@ -70,7 +70,7 @@ namespace SEpedia.UI
             }
 
             pager = new PagerRow(UpdateSlots);
-            pager.Configure(items.Count, UiTheme.BoundedPageSize);
+            pager.Configure(items.Count, UiTheme.DetailSectionPageSize);
             Root.Add(pager.Root);
             UpdateSlots();
         }
@@ -97,7 +97,7 @@ namespace SEpedia.UI
 
         private void Activate(int slotIndex)
         {
-            int itemIndex = pager.Page * UiTheme.BoundedPageSize + slotIndex;
+            int itemIndex = pager.Page * UiTheme.DetailSectionPageSize + slotIndex;
             if (itemIndex >= items.Count || !items[itemIndex].LinkId.HasValue || linkClicked == null)
                 return;
             linkClicked(items[itemIndex].LinkId.Value);
@@ -105,7 +105,7 @@ namespace SEpedia.UI
 
         private void UpdateSlots()
         {
-            int start = pager.Page * UiTheme.BoundedPageSize;
+            int start = pager.Page * UiTheme.DetailSectionPageSize;
             for (int index = 0; index < slots.Length; index++)
             {
                 int itemIndex = start + index;
