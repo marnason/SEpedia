@@ -1,4 +1,5 @@
 # SEpedia
+[![badge](https://shieldcn.dev/badge/vibecoded%20with-Codex.svg?mode=light&logo=ri%3ABsOpenai&logoColor=ffffff&brand=openai)](https://superintelligence-statement.org/) ![built in Faroe Islands](https://shieldcn.dev/flag/fo.svg)
 
 SEpedia is an in-game encyclopedia for Space Engineers. It indexes the definitions registered in the current session, including enabled mods, and presents searchable details and relationships through Rich HUD Master.
 
