@@ -44,7 +44,7 @@ jobs:
         shell: bash
         run: |
           timestamp=$(date -u +'%Y-%m-%d-%H%M')
-          version="nightly-${timestamp}"
+          version="nightly-${timestamp}-${GITHUB_RUN_ID}"
           {
             echo "version=$version"
             echo "archive=SEpedia-nightly.zip"
@@ -57,7 +57,7 @@ jobs:
             --stage "$RUNNER_TEMP/package" \
             --archive "$GITHUB_WORKSPACE/artifacts/${{ steps.release.outputs.archive }}"
 
-      - name: Replace GitHub nightly release
+      - name: Publish GitHub nightly release
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_ARCHIVE: ${{ steps.release.outputs.archive }}
@@ -74,11 +74,14 @@ jobs:
           EOF
           )
 
-          if gh release view nightly >/dev/null 2>&1; then
-            gh release delete nightly --cleanup-tag --yes
-          fi
+          mapfile -t previous_tags < <(
+            gh release list \
+              --limit 100 \
+              --json name,tagName \
+              --jq '.[] | select(.name == "nightly") | .tagName'
+          )
 
-          gh release create nightly \
+          gh release create "$RELEASE_VERSION" \
             "artifacts/${RELEASE_ARCHIVE}#Workshop-ready mod archive" \
             "artifacts/${RELEASE_ARCHIVE}.sha256#SHA-256 checksum" \
             --target "$GITHUB_SHA" \
@@ -86,3 +89,9 @@ jobs:
             --notes "$notes" \
             --generate-notes \
             --latest=false
+
+          for previous_tag in "${previous_tags[@]}"; do
+            if [[ "$previous_tag" != "$RELEASE_VERSION" ]]; then
+              gh release delete "$previous_tag" --cleanup-tag --yes
+            fi
+          done
