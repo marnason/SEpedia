@@ -2,7 +2,7 @@
 
 ## Workshop thumbnail generator
 
-The repository-root `thumb.png` was generated with [se-mod-thumbnails](https://github.com/marnason/se-mod-thumbnails) at commit `3e6e2e55b896abe19a7e9fb43776fb58a8cf63ef`, using the text `SEpedia`, background color `#0000`, and padding `100`.
+Every package build regenerates the repository-root `thumb.png` with [se-mod-thumbnails](https://github.com/marnason/se-mod-thumbnails) at commit `3e6e2e55b896abe19a7e9fb43776fb58a8cf63ef`, using the text `SEpedia`, background color `#0000`, and padding `100`. The deterministic 720×450 output remains tracked for repository previews, while packages always use the freshly generated image without comparing it to the committed copy.
 
 - Generator source: public domain under The Unlicense
 - Space Engineers typeface: sourced by the generator from the Space Engineers Mod SDK and retained under the rights of Keen Software House and/or its licensors

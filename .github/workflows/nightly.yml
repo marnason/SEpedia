@@ -1,0 +1,112 @@
+name: Nightly release
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+concurrency:
+  group: nightly-${{ github.sha }}-${{ github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build and publish nightly
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Check out pushed commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
+        with:
+          global-json-file: global.json
+          cache: true
+          cache-dependency-path: packages.lock.json
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version: '1.26.0'
+          cache: false
+
+      - name: Define nightly version
+        id: release
+        shell: bash
+        run: |
+          timestamp=$(date -u +'%Y-%m-%d-%H%M')
+          short_sha=${GITHUB_SHA:0:7}
+          tag="nightly-${timestamp}-${short_sha}-${GITHUB_RUN_ID}"
+          archive="SEpedia-${timestamp}.zip"
+          {
+            echo "version=$timestamp"
+            echo "tag=$tag"
+            echo "archive=$archive"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Install SteamCMD
+        shell: bash
+        run: |
+          sudo dpkg --add-architecture i386
+          sudo apt-get update
+          sudo apt-get install --yes lib32gcc-s1 lib32stdc++6
+          mkdir -p "$RUNNER_TEMP/steamcmd"
+          curl --fail --location --silent --show-error \
+            https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz \
+            | tar -xz -C "$RUNNER_TEMP/steamcmd"
+
+      - name: Install Space Engineers reference assemblies
+        shell: bash
+        run: |
+          "$RUNNER_TEMP/steamcmd/steamcmd.sh" \
+            +@ShutdownOnFailedCommand 1 \
+            +@NoPromptForPassword 1 \
+            +@sSteamCmdForcePlatformType windows \
+            +force_install_dir "$RUNNER_TEMP/space-engineers-ds" \
+            +login anonymous \
+            +app_update 298740 validate \
+            +quit
+          test -f "$RUNNER_TEMP/space-engineers-ds/DedicatedServer64/SpaceEngineers.Game.dll"
+          test -f "$RUNNER_TEMP/space-engineers-ds/DedicatedServer64/VRage.Game.dll"
+
+      - name: Build Workshop-ready package
+        shell: bash
+        run: |
+          ./scripts/package.sh \
+            --game-bin "$RUNNER_TEMP/space-engineers-ds/DedicatedServer64" \
+            --stage "$RUNNER_TEMP/package" \
+            --archive "$GITHUB_WORKSPACE/artifacts/${{ steps.release.outputs.archive }}"
+
+      - name: Create GitHub pre-release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+          RELEASE_VERSION: ${{ steps.release.outputs.version }}
+          RELEASE_ARCHIVE: ${{ steps.release.outputs.archive }}
+        shell: bash
+        run: |
+          notes=$(cat <<EOF
+          > [!WARNING]
+          > This is an automated GitHub-only nightly build. It has not been published to Steam Workshop and may be unstable.
+
+          Built from commit [\`${GITHUB_SHA}\`](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}).
+          EOF
+          )
+          gh release create "$RELEASE_TAG" \
+            "artifacts/${RELEASE_ARCHIVE}#Workshop-ready mod archive" \
+            "artifacts/${RELEASE_ARCHIVE}.sha256#SHA-256 checksum" \
+            --target "$GITHUB_SHA" \
+            --title "SEpedia Nightly ${RELEASE_VERSION}" \
+            --notes "$notes" \
+            --generate-notes \
+            --prerelease \
+            --latest=false
