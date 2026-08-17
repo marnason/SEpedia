@@ -13,7 +13,6 @@ namespace SEpedia.UI
         #region State
 
         public event Action FiltersChanged;
-        public event Action ResetRequested;
 
         private readonly CatalogFilter filter;
         private readonly ScrollBox content;
@@ -51,43 +50,7 @@ namespace SEpedia.UI
             UiTheme.StyleVerticalScrollBar(content.ScrollBar);
 
             var definitionSection = new FilterSectionPanel(content);
-
-            var reset = new LabelBoxButton
-            {
-                Text = new RichText("X", GlyphFormat.White.WithAlignment(TextAlignment.Center).WithSize(.9f)),
-                Height = 30f,
-                Width = 30f,
-                AutoResize = false,
-                VertCenterText = true,
-                TextPadding = Vector2.Zero,
-                Color = UiTheme.Danger,
-                HighlightColor = UiTheme.DangerHighlight
-            };
-            reset.MouseInput.ToolTip = "Reset advanced filters";
-            reset.MouseInput.LeftClicked += delegate
-            {
-                Action handler = ResetRequested;
-                if (handler != null)
-                    handler();
-            };
-
-            var definitionHeading = new Label
-            {
-                Text = new RichText("Definition flags", GlyphFormat.Blueish.WithSize(.88f)),
-                Height = 30f,
-                AutoResize = false,
-                VertCenterText = true,
-                Padding = new Vector2(12f, 0f)
-            };
-            var definitionHeader = new HudChain(false)
-            {
-                Height = 30f,
-                SizingMode = HudChainSizingModes.FitMembersOffAxis,
-                Spacing = 4f
-            };
-            definitionHeader.Add(definitionHeading, 1f);
-            definitionHeader.Add(reset);
-            definitionSection.Add(definitionHeader);
+            definitionSection.Add(CreateHeading("Definition flags"));
 
             enabledFilter = AddTriState(definitionSection, "Enabled", delegate(TriStateFilter value) { filter.EnabledState = value; });
             publicFilter = AddTriState(definitionSection, "Public", delegate(TriStateFilter value) { filter.PublicState = value; });
@@ -173,6 +136,14 @@ namespace SEpedia.UI
             string name,
             Action<TriStateFilter> setValue)
         {
+            var label = new Label
+            {
+                Text = new RichText(name, GlyphFormat.White.WithSize(.76f)),
+                Height = 34f,
+                AutoResize = false,
+                VertCenterText = true,
+                Padding = new Vector2(12f, 0f)
+            };
             var dropdown = new Dropdown<TriStateFilter>
             {
                 Height = 34f,
@@ -181,9 +152,9 @@ namespace SEpedia.UI
                 LineHeight = 25f,
                 DropdownHeight = 78f
             };
-            dropdown.Add(new RichText(name + ": Either", GlyphFormat.White.WithSize(.76f)), TriStateFilter.Either);
-            dropdown.Add(new RichText(name + ": Yes", GlyphFormat.White.WithSize(.76f)), TriStateFilter.Yes);
-            dropdown.Add(new RichText(name + ": No", GlyphFormat.White.WithSize(.76f)), TriStateFilter.No);
+            dropdown.Add(new RichText("Either", GlyphFormat.White.WithSize(.76f)), TriStateFilter.Either);
+            dropdown.Add(new RichText("Yes", GlyphFormat.White.WithSize(.76f)), TriStateFilter.Yes);
+            dropdown.Add(new RichText("No", GlyphFormat.White.WithSize(.76f)), TriStateFilter.No);
             dropdown.ValueChanged += delegate
             {
                 if (!updating && dropdown.Value != null)
@@ -192,7 +163,16 @@ namespace SEpedia.UI
                     RaiseChanged();
                 }
             };
-            section.Add(dropdown);
+
+            var row = new HudChain(false)
+            {
+                Height = 34f,
+                SizingMode = HudChainSizingModes.FitMembersOffAxis,
+                Spacing = 4f
+            };
+            row.Add(label, 1f);
+            row.Add(dropdown, 1f);
+            section.Add(row);
             return dropdown;
         }
 

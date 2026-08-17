@@ -13,6 +13,7 @@ namespace SEpedia.UI
 
         public event Action<CatalogEntry> SelectionChanged;
         public event Action FilterRequested;
+        public event Action ResetFiltersRequested;
         public event Action ResultsChanged;
 
         private readonly DefinitionIndex definitions;
@@ -21,9 +22,12 @@ namespace SEpedia.UI
         private readonly ListBox<CatalogEntry> list;
         private readonly PagerRow pager;
         private readonly Label status;
+        private readonly Label activeFilterStatus;
+        private readonly LabelBoxButton resetFiltersButton;
         private CatalogIndex catalog;
         private CatalogResult currentResults;
         private DefinitionDocument includedDefinition;
+        private int pendingRevealIndex;
         private bool updating;
 
         public CatalogEntry First
@@ -64,6 +68,7 @@ namespace SEpedia.UI
             this.definitions = definitions;
             this.filter = filter;
             catalog = new CatalogIndex(definitions, planets);
+            pendingRevealIndex = -1;
             categoryBar = new CategoryBar(filter, Refresh);
 
             var filterButton = new LabelBoxButton
@@ -82,6 +87,47 @@ namespace SEpedia.UI
                 if (handler != null)
                     handler();
             };
+
+            activeFilterStatus = new Label
+            {
+                Width = 108f,
+                Height = 29f,
+                AutoResize = false,
+                VertCenterText = true,
+                Format = GlyphFormat.Blueish.WithAlignment(TextAlignment.Right).WithSize(.66f),
+                Padding = new Vector2(6f, 0f),
+                Visible = false
+            };
+
+            resetFiltersButton = new LabelBoxButton
+            {
+                Text = new RichText("X", GlyphFormat.White.WithAlignment(TextAlignment.Center).WithSize(.9f)),
+                Height = 29f,
+                Width = 29f,
+                AutoResize = false,
+                VertCenterText = true,
+                TextPadding = Vector2.Zero,
+                Color = UiTheme.Danger,
+                HighlightColor = UiTheme.DangerHighlight,
+                Visible = false
+            };
+            resetFiltersButton.MouseInput.ToolTip = "Reset filters";
+            resetFiltersButton.MouseInput.LeftClicked += delegate
+            {
+                Action handler = ResetFiltersRequested;
+                if (handler != null)
+                    handler();
+            };
+
+            var filterRow = new HudChain(false)
+            {
+                Height = 29f,
+                SizingMode = HudChainSizingModes.FitMembersOffAxis,
+                Spacing = 2f
+            };
+            filterRow.Add(filterButton, 1f);
+            filterRow.Add(activeFilterStatus);
+            filterRow.Add(resetFiltersButton);
 
             list = new ListBox<CatalogEntry>
             {
@@ -110,7 +156,7 @@ namespace SEpedia.UI
                 DimAlignment = DimAlignments.UnpaddedSize,
                 SizingMode = HudChainSizingModes.FitMembersOffAxis,
                 Spacing = 2f,
-                CollectionContainer = { filterButton, { list, 1f }, pager.Root, status }
+                CollectionContainer = { filterRow, { list, 1f }, pager.Root, status }
             };
 
             Refresh();
@@ -140,6 +186,7 @@ namespace SEpedia.UI
 
         private void RefreshResults()
         {
+            pendingRevealIndex = -1;
             string previousKey = list.Value != null && list.Value.AssocMember != null
                 ? list.Value.AssocMember.StableKey
                 : string.Empty;
@@ -185,6 +232,7 @@ namespace SEpedia.UI
             status.Text = currentResults.TotalCount > UiTheme.CatalogPageSize
                 ? "Showing " + first + "–" + last + " of " + currentResults.TotalCount + " " + categoryName
                 : currentResults.TotalCount + " " + categoryName;
+            UpdateActiveFilterStatus();
 
             if (list.Value != null)
                 RaiseSelectionChanged(list.Value.AssocMember);
@@ -204,10 +252,34 @@ namespace SEpedia.UI
 
         #region Layout and Selection
 
+        protected override void HandleInput(Vector2 cursorPos)
+        {
+            if (pendingRevealIndex < 0)
+                return;
+
+            int revealIndex = pendingRevealIndex;
+            pendingRevealIndex = -1;
+            list.EntryChain.Start = revealIndex;
+        }
+
         private void ScrollToTop()
         {
             list.EntryChain.ScrollBar.Value = 0f;
             list.EntryChain.Start = 0;
+        }
+
+        private void UpdateActiveFilterStatus()
+        {
+            int count = filter.GetActiveAdvancedFilterCount();
+            bool active = count > 0;
+            activeFilterStatus.Visible = active;
+            resetFiltersButton.Visible = active;
+            if (active)
+            {
+                activeFilterStatus.Text = new RichText(
+                    count + (count == 1 ? " filter active" : " filters active"),
+                    activeFilterStatus.Format);
+            }
         }
 
         public void UpdateCategoryLayout(float availableWidth)
@@ -226,7 +298,7 @@ namespace SEpedia.UI
                 if (entry.Definition != null && entry.Definition.Id == definition.Id)
                 {
                     list.SetSelectionAt(index);
-                    list.EntryChain.Start = index;
+                    pendingRevealIndex = index;
                     return true;
                 }
             }

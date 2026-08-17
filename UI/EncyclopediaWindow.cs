@@ -13,6 +13,7 @@ namespace SEpedia.UI
         private readonly bool survivalMode;
         private readonly CelestialIndex celestial;
         private readonly TextField searchField;
+        private readonly LabelBoxButton closeButton;
         private readonly DefinitionList definitionList;
         private readonly AdvancedFilterDrawer filterDrawer;
         private readonly DefinitionView definitionView;
@@ -43,10 +44,26 @@ namespace SEpedia.UI
                 Width = 310f,
                 Height = 25f,
                 ParentAlignment = ParentAlignments.InnerRight,
+                Offset = new Vector2(-31f, 0f),
                 AutoResize = false,
                 Format = GlyphFormat.White.WithSize(.82f),
                 UpdateValueCallback = SearchChanged
             };
+
+            closeButton = new LabelBoxButton(header)
+            {
+                Text = new RichText("X", GlyphFormat.White.WithAlignment(TextAlignment.Center).WithSize(.9f)),
+                Width = 29f,
+                Height = 29f,
+                ParentAlignment = ParentAlignments.InnerRight,
+                AutoResize = false,
+                VertCenterText = true,
+                TextPadding = Vector2.Zero,
+                Color = new Color(0, 0, 0, 0),
+                HighlightColor = new Color(0, 0, 0, 0),
+                HighlightEnabled = false
+            };
+            closeButton.MouseInput.ToolTip = "Close";
 
             definitionList = new DefinitionList(index, filter, celestial != null ? celestial.Planets : null)
             {
@@ -61,6 +78,7 @@ namespace SEpedia.UI
 
             definitionView = new DefinitionView(index);
             vanillaHud = new VanillaHudVisibilityController();
+            closeButton.MouseInput.LeftClicked += delegate { Hide(); };
 
             var content = new HudChain(false)
             {
@@ -79,9 +97,9 @@ namespace SEpedia.UI
 
             navigation = new NavigationController(index, definitionList, definitionView);
             definitionList.FilterRequested += ToggleFilters;
+            definitionList.ResetFiltersRequested += ResetFilters;
             definitionList.ResultsChanged += RefreshFilterDrawer;
             filterDrawer.FiltersChanged += FiltersChanged;
-            filterDrawer.ResetRequested += ResetFilters;
 
             BodyColor = new Color(31, 40, 47, 245);
             BorderColor = new Color(58, 68, 77);
@@ -102,27 +120,31 @@ namespace SEpedia.UI
         {
             if (closed)
                 return;
-            Visible = !Visible;
-
             if (Visible)
             {
-                try
-                {
-                    vanillaHud.Hide();
-                    GetWindowFocus();
-                }
-                catch
-                {
-                    vanillaHud.Restore();
-                    Visible = false;
-                    throw;
-                }
+                Hide();
+                return;
             }
-            else
+
+            Visible = true;
+            try
             {
-                searchField.CloseInput();
-                vanillaHud.Restore();
+                vanillaHud.Hide();
+                GetWindowFocus();
             }
+            catch
+            {
+                vanillaHud.Restore();
+                Visible = false;
+                throw;
+            }
+        }
+
+        private void Hide()
+        {
+            searchField.CloseInput();
+            Visible = false;
+            vanillaHud.Restore();
         }
 
         public void RefreshCelestial()
@@ -139,9 +161,9 @@ namespace SEpedia.UI
             searchField.CloseInput();
             Visible = false;
             vanillaHud.Restore();
-            filterDrawer.ResetRequested -= ResetFilters;
             filterDrawer.FiltersChanged -= FiltersChanged;
             definitionList.ResultsChanged -= RefreshFilterDrawer;
+            definitionList.ResetFiltersRequested -= ResetFilters;
             definitionList.FilterRequested -= ToggleFilters;
             navigation.Close();
             Unregister();

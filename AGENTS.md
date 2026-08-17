@@ -17,6 +17,7 @@ MUST and MUST NOT are requirements. SHOULD is the default unless repository evid
 - Check the maintained [Rich HUD client documentation](https://zachhembree.github.io/RichHudFramework.Client/index.html), [official example](https://github.com/ZachHembree/TextEditorExample), and matching vendored implementation before changing version-sensitive integration.
 - Definition-supplied icons MUST NOT be collected, resolved, packaged, or rendered. Headers remain text-only unless the user approves a new direction.
 - Bound or page runtime-sized Rich HUD collections. A `HudChain`-managed axis MUST have one layout owner; do not overwrite chain allocation with `DimAlignment` or manual compensation.
+- After rebuilding a Rich HUD scroll collection, apply a requested `Start`, `End`, or pixel offset only from a post-layout hook on a later frame, such as `HandleInput`. The retained-mode layout recalculates scrollbar bounds after the rebuild, so same-stack offsets can clamp against stale bounds; recheck the maintained [Rich HUD client documentation](https://zachhembree.github.io/RichHudFramework.Client/index.html) and matching vendored `ScrollBox` implementation when changing this flow.
 - `RichHudFramework/` is vendored source. Do not reformat, reorganize, or otherwise mix vendor changes into normal first-party work.
 
 ## Code organization

@@ -93,6 +93,7 @@ namespace SEpedia.Core
         public HashSet<string> SelectedSourceKeys { get; private set; }
         public HashSet<MyCubeSize> SelectedGridSizes { get; private set; }
         public HashSet<string> SelectedBlockTypes { get; private set; }
+        private TriStateFilter defaultSurvivalState;
 
         #endregion
 
@@ -110,15 +111,42 @@ namespace SEpedia.Core
 
         public void ResetAdvanced(bool survivalMode)
         {
+            defaultSurvivalState = survivalMode ? TriStateFilter.Yes : TriStateFilter.Either;
             EnabledState = TriStateFilter.Yes;
             PublicState = TriStateFilter.Yes;
-            SurvivalState = survivalMode ? TriStateFilter.Yes : TriStateFilter.Either;
+            SurvivalState = defaultSurvivalState;
             BuildMenuState = TriStateFilter.Yes;
             SelectedSourceKeys.Clear();
             SelectedGridSizes.Clear();
             SelectedGridSizes.Add(MyCubeSize.Small);
             SelectedGridSizes.Add(MyCubeSize.Large);
             SelectedBlockTypes.Clear();
+        }
+
+        public int GetActiveAdvancedFilterCount()
+        {
+            int count = 0;
+            if (EnabledState != TriStateFilter.Yes)
+                count++;
+            if (PublicState != TriStateFilter.Yes)
+                count++;
+            if (SurvivalState != defaultSurvivalState)
+                count++;
+            if (SelectedSourceKeys.Count > 0)
+                count++;
+
+            if (Category == BrowseCategory.Blocks)
+            {
+                if (BuildMenuState != TriStateFilter.Yes)
+                    count++;
+                if (SelectedGridSizes.Count != 2 ||
+                    !SelectedGridSizes.Contains(MyCubeSize.Small) ||
+                    !SelectedGridSizes.Contains(MyCubeSize.Large))
+                    count++;
+                if (SelectedBlockTypes.Count > 0)
+                    count++;
+            }
+            return count;
         }
 
         #endregion
