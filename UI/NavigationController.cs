@@ -44,7 +44,7 @@ namespace SEpedia.UI
             {
                 view.Show(definition);
                 if (synchronizeList)
-                    list.TrySelect(definition);
+                    list.TryReveal(definition);
             }
             finally
             {

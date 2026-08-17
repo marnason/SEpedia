@@ -97,33 +97,26 @@ namespace SEpedia.Core
 
         public CatalogResult Query(CatalogFilter filter, int offset, int limit)
         {
+            return Query(filter, offset, limit, null);
+        }
+
+        public CatalogResult Query(
+            CatalogFilter filter,
+            int offset,
+            int limit,
+            DefinitionDocument includedDefinition)
+        {
             if (filter == null)
                 throw new ArgumentNullException("filter");
 
-            string query = Normalize(filter.SearchText).Trim();
-            string[] tokens = query.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
-            List<SearchableEntry> categoryList;
-            IReadOnlyList<SearchableEntry> categoryEntries = entriesByCategory.TryGetValue(filter.Category, out categoryList)
-                ? categoryList
-                : EmptyEntries;
             List<FacetCount> sources;
             List<FacetCount> blockTypes;
-            BuildFacets(categoryEntries, filter, query, tokens, out sources, out blockTypes);
+            List<ScoredEntry> matches = FindMatches(
+                filter,
+                includedDefinition,
+                out sources,
+                out blockTypes);
 
-            var matches = new List<ScoredEntry>();
-
-            for (int index = 0; index < categoryEntries.Count; index++)
-            {
-                SearchableEntry searchable = categoryEntries[index];
-                if (!MatchesAllFilters(searchable.Entry, filter))
-                    continue;
-
-                int score = Score(searchable, query, tokens);
-                if (score >= 0)
-                    matches.Add(new ScoredEntry { Entry = searchable.Entry, Score = score });
-            }
-
-            matches.Sort(CompareScored);
             int first = Math.Min(Math.Max(0, offset), matches.Count);
             int count = Math.Min(Math.Max(0, limit), matches.Count - first);
             var result = new List<CatalogEntry>(count);
@@ -131,6 +124,66 @@ namespace SEpedia.Core
                 result.Add(matches[first + index].Entry);
 
             return new CatalogResult(result, matches.Count, sources, blockTypes);
+        }
+
+        public int FindDefinitionResultIndex(
+            CatalogFilter filter,
+            MyDefinitionId definitionId,
+            DefinitionDocument includedDefinition,
+            out int totalCount)
+        {
+            if (filter == null)
+                throw new ArgumentNullException("filter");
+
+            List<FacetCount> sources;
+            List<FacetCount> blockTypes;
+            List<ScoredEntry> matches = FindMatches(
+                filter,
+                includedDefinition,
+                out sources,
+                out blockTypes);
+            totalCount = matches.Count;
+            for (int index = 0; index < matches.Count; index++)
+            {
+                DefinitionDocument definition = matches[index].Entry.Definition;
+                if (definition != null && definition.Id == definitionId)
+                    return index;
+            }
+            return -1;
+        }
+
+        private List<ScoredEntry> FindMatches(
+            CatalogFilter filter,
+            DefinitionDocument includedDefinition,
+            out List<FacetCount> sources,
+            out List<FacetCount> blockTypes)
+        {
+            string query = Normalize(filter.SearchText).Trim();
+            string[] tokens = query.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+            List<SearchableEntry> categoryList;
+            IReadOnlyList<SearchableEntry> categoryEntries = entriesByCategory.TryGetValue(filter.Category, out categoryList)
+                ? categoryList
+                : EmptyEntries;
+            BuildFacets(categoryEntries, filter, query, tokens, out sources, out blockTypes);
+
+            var matches = new List<ScoredEntry>();
+
+            for (int index = 0; index < categoryEntries.Count; index++)
+            {
+                SearchableEntry searchable = categoryEntries[index];
+                bool isIncludedDefinition = includedDefinition != null &&
+                    searchable.Entry.Definition != null &&
+                    searchable.Entry.Definition.Id == includedDefinition.Id;
+                if (!isIncludedDefinition && !MatchesAllFilters(searchable.Entry, filter))
+                    continue;
+
+                int score = Score(searchable, query, tokens);
+                if (score >= 0 || isIncludedDefinition)
+                    matches.Add(new ScoredEntry { Entry = searchable.Entry, Score = score });
+            }
+
+            matches.Sort(CompareScored);
+            return matches;
         }
 
         #endregion

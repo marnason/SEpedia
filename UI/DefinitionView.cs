@@ -38,6 +38,7 @@ namespace SEpedia.UI
                 Spacing = 3f,
                 UseSmoothScrolling = true
             };
+            UiTheme.StyleVerticalScrollBar(content.ScrollBar);
             header = new DefinitionHeader();
             ShowMessage("Select a definition to inspect it.");
         }
@@ -67,6 +68,7 @@ namespace SEpedia.UI
         {
             ClearRows();
             AddParagraph(message);
+            ScrollToTop();
         }
 
         #endregion
@@ -120,7 +122,7 @@ namespace SEpedia.UI
                         break;
                 }
             }
-            content.Start = 0;
+            ScrollToTop();
         }
 
         private void AddPagedSection(string heading, IReadOnlyList<DetailItem> items, bool major)
@@ -186,6 +188,12 @@ namespace SEpedia.UI
             rows.Clear();
             pagedSections.Clear();
             layoutDirty = true;
+        }
+
+        private void ScrollToTop()
+        {
+            content.ScrollBar.Value = 0f;
+            content.Start = 0;
         }
 
         #endregion

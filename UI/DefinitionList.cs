@@ -23,6 +23,7 @@ namespace SEpedia.UI
         private readonly Label status;
         private CatalogIndex catalog;
         private CatalogResult currentResults;
+        private DefinitionDocument includedDefinition;
         private bool updating;
 
         public CatalogEntry First
@@ -86,10 +87,12 @@ namespace SEpedia.UI
             {
                 DimAlignment = DimAlignments.Width,
                 Format = GlyphFormat.White.WithSize(.85f),
+                HighlightPadding = new Vector2(2f, 0f),
                 LineHeight = 27f,
                 MemberPadding = new Vector2(24f, 4f),
                 UpdateValueCallback = OnSelectionChanged
             };
+            UiTheme.StyleVerticalScrollBar(list.EntryChain.ScrollBar);
 
             pager = new PagerRow(RefreshPage);
 
@@ -125,6 +128,7 @@ namespace SEpedia.UI
 
         public void Refresh()
         {
+            includedDefinition = null;
             pager.Reset();
             RefreshResults();
         }
@@ -142,8 +146,13 @@ namespace SEpedia.UI
 
             filter.NormalizeForCategory();
             int offset = pager.Page * UiTheme.CatalogPageSize;
-            currentResults = catalog.Query(filter, offset, UiTheme.CatalogPageSize);
-            if (filter.ReconcileAvailableFacets(currentResults.Sources, currentResults.BlockTypes))
+            currentResults = catalog.Query(
+                filter,
+                offset,
+                UiTheme.CatalogPageSize,
+                includedDefinition);
+            if (includedDefinition == null &&
+                filter.ReconcileAvailableFacets(currentResults.Sources, currentResults.BlockTypes))
                 currentResults = catalog.Query(filter, offset, UiTheme.CatalogPageSize);
             pager.Configure(currentResults.TotalCount, UiTheme.CatalogPageSize);
             updating = true;
@@ -168,6 +177,7 @@ namespace SEpedia.UI
             {
                 updating = false;
             }
+            ScrollToTop();
 
             string categoryName = CatalogText.GetCategoryName(filter.Category).ToLowerInvariant();
             int first = pager.Page * UiTheme.CatalogPageSize + 1;
@@ -194,6 +204,12 @@ namespace SEpedia.UI
 
         #region Layout and Selection
 
+        private void ScrollToTop()
+        {
+            list.EntryChain.ScrollBar.Value = 0f;
+            list.EntryChain.Start = 0;
+        }
+
         public void UpdateCategoryLayout(float availableWidth)
         {
             categoryBar.UpdateLayout(availableWidth);
@@ -210,10 +226,40 @@ namespace SEpedia.UI
                 if (entry.Definition != null && entry.Definition.Id == definition.Id)
                 {
                     list.SetSelectionAt(index);
+                    list.EntryChain.Start = index;
                     return true;
                 }
             }
             return false;
+        }
+
+        public bool TryReveal(DefinitionDocument definition)
+        {
+            includedDefinition = null;
+            if (definition == null || definition.BrowseCategory == BrowseCategory.None)
+                return false;
+
+            filter.Category = definition.BrowseCategory;
+            filter.NormalizeForCategory();
+            categoryBar.UpdateSelection();
+            includedDefinition = definition;
+
+            int totalCount;
+            int resultIndex = catalog.FindDefinitionResultIndex(
+                filter,
+                definition.Id,
+                includedDefinition,
+                out totalCount);
+            if (resultIndex < 0)
+            {
+                includedDefinition = null;
+                return false;
+            }
+
+            pager.Configure(totalCount, UiTheme.CatalogPageSize);
+            pager.SetPage(resultIndex / UiTheme.CatalogPageSize);
+            RefreshResults();
+            return TrySelect(definition);
         }
 
         #endregion

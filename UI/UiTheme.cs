@@ -12,6 +12,7 @@ namespace SEpedia.UI
         public const int AdvancedFilterPageSize = 8;
         public const int DetailSectionPageSize = 16;
         public const int CatalogPageSize = 500;
+        public const float VerticalScrollBarWidth = 23f;
 
         public static readonly Color Panel = new Color(36, 47, 55);
         public static readonly Color PanelHighlight = new Color(67, 82, 92);
@@ -31,6 +32,13 @@ namespace SEpedia.UI
         public static GlyphFormat PagerLabel
         {
             get { return GlyphFormat.Blueish.WithAlignment(TextAlignment.Center).WithSize(.72f); }
+        }
+
+        public static void StyleVerticalScrollBar(ScrollBar scrollBar)
+        {
+            scrollBar.Padding = new Vector2(10f);
+            scrollBar.Width = VerticalScrollBarWidth;
+            scrollBar.SlideInput.Offset = new Vector2(.5f, 0f);
         }
     }
 }

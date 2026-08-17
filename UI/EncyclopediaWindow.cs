@@ -50,7 +50,7 @@ namespace SEpedia.UI
 
             definitionList = new DefinitionList(index, filter, celestial != null ? celestial.Planets : null)
             {
-                Width = 315f
+                Width = 252f
             };
 
             filterDrawer = new AdvancedFilterDrawer(filter)
@@ -155,7 +155,7 @@ namespace SEpedia.UI
         {
             base.Layout();
             SetWidthIfChanged(searchField, Math.Min(360f, Math.Max(220f, Width * .32f)));
-            SetWidthIfChanged(definitionList, Math.Min(350f, Math.Max(275f, body.Width * .28f)));
+            SetWidthIfChanged(definitionList, Math.Min(280f, Math.Max(220f, body.Width * .224f)));
             SetWidthIfChanged(filterDrawer, Math.Min(320f, Math.Max(250f, body.Width * .25f)));
             definitionList.UpdateCategoryLayout(body.Width);
         }

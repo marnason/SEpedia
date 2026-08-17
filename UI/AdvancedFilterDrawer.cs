@@ -26,6 +26,7 @@ namespace SEpedia.UI
         private readonly List<ScrollBoxEntry> blockOnlyEntries;
         private readonly PagedFacetSection blockTypes;
         private readonly PagedFacetSection sources;
+        private BrowseCategory lastCategory;
         private bool updating;
 
         #endregion
@@ -36,6 +37,7 @@ namespace SEpedia.UI
         {
             this.filter = filter;
             blockOnlyEntries = new List<ScrollBoxEntry>();
+            lastCategory = filter.Category;
             Width = 300f;
 
             content = new ScrollBox(this)
@@ -46,6 +48,7 @@ namespace SEpedia.UI
                 Spacing = 7f,
                 UseSmoothScrolling = true
             };
+            UiTheme.StyleVerticalScrollBar(content.ScrollBar);
 
             var definitionSection = new FilterSectionPanel(content);
 
@@ -126,6 +129,7 @@ namespace SEpedia.UI
             if (result == null)
                 return;
 
+            bool categoryChanged = lastCategory != filter.Category;
             updating = true;
             try
             {
@@ -150,6 +154,13 @@ namespace SEpedia.UI
             finally
             {
                 updating = false;
+            }
+
+            if (categoryChanged)
+            {
+                content.ScrollBar.Value = 0f;
+                content.Start = 0;
+                lastCategory = filter.Category;
             }
         }
 
