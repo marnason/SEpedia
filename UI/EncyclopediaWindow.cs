@@ -49,6 +49,8 @@ namespace SEpedia.UI
                 Format = GlyphFormat.White.WithSize(.82f),
                 UpdateValueCallback = SearchChanged
             };
+            // Keep the draggable header from taking focus back after the text field handles the click.
+            ((MouseInputElement)searchField.MouseInput).ShareCursor = false;
 
             closeButton = new LabelBoxButton(header)
             {

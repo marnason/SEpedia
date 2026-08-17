@@ -28,6 +28,7 @@ namespace SEpedia.UI
         private CatalogResult currentResults;
         private DefinitionDocument includedDefinition;
         private int pendingRevealIndex;
+        private bool revealLayoutReady;
         private bool updating;
 
         public CatalogEntry First
@@ -69,6 +70,7 @@ namespace SEpedia.UI
             this.filter = filter;
             catalog = new CatalogIndex(definitions, planets);
             pendingRevealIndex = -1;
+            revealLayoutReady = false;
             categoryBar = new CategoryBar(filter, Refresh);
 
             var filterButton = new LabelBoxButton
@@ -187,6 +189,7 @@ namespace SEpedia.UI
         private void RefreshResults()
         {
             pendingRevealIndex = -1;
+            revealLayoutReady = false;
             string previousKey = list.Value != null && list.Value.AssocMember != null
                 ? list.Value.AssocMember.StableKey
                 : string.Empty;
@@ -252,14 +255,43 @@ namespace SEpedia.UI
 
         #region Layout and Selection
 
-        protected override void HandleInput(Vector2 cursorPos)
+        protected override void Layout()
         {
             if (pendingRevealIndex < 0)
                 return;
 
+            if (!revealLayoutReady)
+            {
+                revealLayoutReady = true;
+                return;
+            }
+
             int revealIndex = pendingRevealIndex;
             pendingRevealIndex = -1;
-            list.EntryChain.Start = revealIndex;
+            revealLayoutReady = false;
+            CenterListOn(revealIndex);
+        }
+
+        private void CenterListOn(int targetIndex)
+        {
+            float targetCenter = 0f;
+            for (int index = 0; index <= targetIndex && index < list.EntryList.Count; index++)
+            {
+                ListBoxEntry<CatalogEntry> entry = list.EntryList[index];
+                if (!entry.Enabled)
+                    continue;
+
+                float rowHeight = entry.Element.UnpaddedSize.Y + entry.Element.Padding.Y;
+                if (index == targetIndex)
+                {
+                    targetCenter += rowHeight * .5f;
+                    break;
+                }
+                targetCenter += rowHeight + list.EntryChain.Spacing;
+            }
+
+            float centeredOffset = targetCenter - list.EntryChain.UnpaddedSize.Y * .5f;
+            list.EntryChain.ScrollBar.Value = Math.Max(0f, centeredOffset);
         }
 
         private void ScrollToTop()
@@ -299,6 +331,7 @@ namespace SEpedia.UI
                 {
                     list.SetSelectionAt(index);
                     pendingRevealIndex = index;
+                    revealLayoutReady = false;
                     return true;
                 }
             }

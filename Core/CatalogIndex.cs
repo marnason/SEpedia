@@ -167,6 +167,7 @@ namespace SEpedia.Core
             BuildFacets(categoryEntries, filter, query, tokens, out sources, out blockTypes);
 
             var matches = new List<ScoredEntry>();
+            bool forcedDefinitionIncluded = false;
 
             for (int index = 0; index < categoryEntries.Count; index++)
             {
@@ -174,15 +175,20 @@ namespace SEpedia.Core
                 bool isIncludedDefinition = includedDefinition != null &&
                     searchable.Entry.Definition != null &&
                     searchable.Entry.Definition.Id == includedDefinition.Id;
-                if (!isIncludedDefinition && !MatchesAllFilters(searchable.Entry, filter))
+                bool matchesFilters = MatchesAllFilters(searchable.Entry, filter);
+                int score = Score(searchable, query, tokens);
+                bool forceInclude = isIncludedDefinition && (!matchesFilters || score < 0);
+                if (!forceInclude && (!matchesFilters || score < 0))
                     continue;
 
-                int score = Score(searchable, query, tokens);
-                if (score >= 0 || isIncludedDefinition)
-                    matches.Add(new ScoredEntry { Entry = searchable.Entry, Score = score });
+                forcedDefinitionIncluded |= forceInclude;
+                matches.Add(new ScoredEntry { Entry = searchable.Entry, Score = score });
             }
 
-            matches.Sort(CompareScored);
+            if (forcedDefinitionIncluded)
+                matches.Sort(CompareAlphabetically);
+            else
+                matches.Sort(CompareScored);
             return matches;
         }
 
@@ -356,6 +362,18 @@ namespace SEpedia.Core
             int score = right.Score.CompareTo(left.Score);
             if (score != 0)
                 return score;
+            return CompareAlphabetically(left, right);
+        }
+
+        private static int CompareAlphabetically(ScoredEntry left, ScoredEntry right)
+        {
+            if (left.Entry.Category == BrowseCategory.Celestial && right.Entry.Category == BrowseCategory.Celestial)
+            {
+                int kind = left.Entry.CelestialSortOrder.CompareTo(right.Entry.CelestialSortOrder);
+                if (kind != 0)
+                    return kind;
+            }
+
             int name = string.Compare(left.Entry.DisplayName, right.Entry.DisplayName, StringComparison.OrdinalIgnoreCase);
             return name != 0
                 ? name
