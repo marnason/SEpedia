@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: nightly-${{ github.sha }}-${{ github.run_id }}
+  group: nightly-release
   cancel-in-progress: false
 
 jobs:
@@ -44,11 +44,10 @@ jobs:
         shell: bash
         run: |
           timestamp=$(date -u +'%Y-%m-%d-%H%M')
-          tag="nightly-${timestamp}"
-          archive="SEpedia-${timestamp}.zip"
+          version="nightly-${timestamp}"
           {
-            echo "tag=$tag"
-            echo "archive=$archive"
+            echo "version=$version"
+            echo "archive=SEpedia-nightly.zip"
           } >> "$GITHUB_OUTPUT"
 
       - name: Assemble Workshop-ready package
@@ -58,26 +57,32 @@ jobs:
             --stage "$RUNNER_TEMP/package" \
             --archive "$GITHUB_WORKSPACE/artifacts/${{ steps.release.outputs.archive }}"
 
-      - name: Create GitHub pre-release
+      - name: Replace GitHub nightly release
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ steps.release.outputs.tag }}
           RELEASE_ARCHIVE: ${{ steps.release.outputs.archive }}
+          RELEASE_VERSION: ${{ steps.release.outputs.version }}
         shell: bash
         run: |
           notes=$(cat <<EOF
           > [!WARNING]
           > This is an automated GitHub-only nightly build. It has not been published to Steam Workshop and may be unstable.
 
+          Version: \`${RELEASE_VERSION}\`
+
           Built from commit [\`${GITHUB_SHA}\`](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}).
           EOF
           )
-          gh release create "$RELEASE_TAG" \
+
+          if gh release view nightly >/dev/null 2>&1; then
+            gh release delete nightly --cleanup-tag --yes
+          fi
+
+          gh release create nightly \
             "artifacts/${RELEASE_ARCHIVE}#Workshop-ready mod archive" \
             "artifacts/${RELEASE_ARCHIVE}.sha256#SHA-256 checksum" \
             --target "$GITHUB_SHA" \
             --title "nightly" \
             --notes "$notes" \
             --generate-notes \
-            --prerelease \
             --latest=false
