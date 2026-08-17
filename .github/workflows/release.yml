@@ -324,6 +324,7 @@ jobs:
       - name: Create stable GitHub release
         env:
           CHANGELOG: ${{ inputs.changelog }}
+          GH_REPO: ${{ github.repository }}
           GH_TOKEN: ${{ github.token }}
           RELEASE_ARCHIVE: ${{ needs.prepare.outputs.archive }}
           RELEASE_TAG: ${{ needs.prepare.outputs.tag }}

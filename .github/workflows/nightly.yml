@@ -89,6 +89,7 @@ jobs:
 
       - name: Publish GitHub nightly release
         env:
+          GH_REPO: ${{ github.repository }}
           GH_TOKEN: ${{ github.token }}
           RELEASE_ARCHIVE: ${{ needs.package.outputs.archive }}
           RELEASE_VERSION: ${{ needs.package.outputs.version }}
