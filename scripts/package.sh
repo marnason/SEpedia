@@ -5,27 +5,24 @@ script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 repo_root=$(cd -- "$script_dir/.." && pwd)
 thumbnail_module="github.com/marnason/se-mod-thumbnails/cmd/thumbnail@3e6e2e55b896abe19a7e9fb43776fb58a8cf63ef"
 
-game_bin=""
 stage_dir=""
 archive_path=""
-temporary_ini=""
-local_ini_backup=""
 
 usage() {
   cat <<'EOF'
 Usage: scripts/package.sh [options]
 
-Build and package SEpedia with MDK.
+Build or package SEpedia.
 
 Options:
-  --game-bin PATH  Space Engineers binary directory used by CI.
-  --stage PATH     Isolated MDK output directory used by CI.
+  --stage PATH     Assemble a source-only Workshop package for CI.
   --archive PATH   ZIP path to create from the staged SEpedia folder.
   -h, --help       Show this help.
 
 With no options, the script uses the developer's ignored MDK local settings and
-deploys normally. CI must supply --game-bin and --stage together. --archive
-requires --stage and also creates PATH.sha256.
+performs a normal MDK Release build/deployment. CI supplies --stage; --archive
+requires --stage and also creates PATH.sha256. Source-only packages are compiled
+by Space Engineers when the mod is loaded.
 EOF
 }
 
@@ -34,23 +31,8 @@ fail() {
   exit 1
 }
 
-cleanup() {
-  if [[ -n "$temporary_ini" && -f "$temporary_ini" ]]; then
-    rm -f -- "$temporary_ini"
-  fi
-  if [[ -n "$local_ini_backup" && -f "$local_ini_backup" ]]; then
-    mv -- "$local_ini_backup" "$repo_root/mdk.local.ini"
-  fi
-}
-trap cleanup EXIT
-
 while (($# > 0)); do
   case "$1" in
-    --game-bin)
-      (($# >= 2)) || fail "--game-bin requires a path"
-      game_bin=$2
-      shift 2
-      ;;
     --stage)
       (($# >= 2)) || fail "--stage requires a path"
       stage_dir=$2
@@ -71,10 +53,6 @@ while (($# > 0)); do
   esac
 done
 
-if [[ -n "$game_bin" || -n "$stage_dir" ]]; then
-  [[ -n "$game_bin" && -n "$stage_dir" ]] || fail "--game-bin and --stage must be supplied together"
-  [[ -d "$game_bin" ]] || fail "game binary directory does not exist: $game_bin"
-fi
 if [[ -n "$archive_path" && -z "$stage_dir" ]]; then
   fail "--archive requires --stage"
 fi
@@ -99,44 +77,54 @@ go run "$thumbnail_module" \
 if [[ -n "$stage_dir" ]]; then
   mkdir -p -- "$stage_dir"
   stage_dir=$(cd -- "$stage_dir" && pwd)
-  game_bin=$(cd -- "$game_bin" && pwd)
   [[ ! -e "$stage_dir/SEpedia" ]] || fail "stage already contains a SEpedia package: $stage_dir"
-
-  temporary_ini="$repo_root/mdk.local.ini"
-  if [[ -e "$temporary_ini" ]]; then
-    backup_candidate=$(mktemp "${TMPDIR:-/tmp}/sepedia-mdk-local.XXXXXX")
-    cp -p -- "$temporary_ini" "$backup_candidate"
-    local_ini_backup=$backup_candidate
-    rm -f -- "$temporary_ini"
-  fi
-  {
-    printf '[mdk]\n'
-    printf 'binarypath=%s\n' "$game_bin"
-    printf 'output=%s\n' "$stage_dir"
-    printf 'interactive=DoNothing\n'
-  } > "$temporary_ini"
 fi
 
 dotnet restore "$repo_root/SEpedia.sln" --locked-mode
-dotnet build "$repo_root/SEpedia.sln" \
-  --configuration Release \
-  --no-restore \
-  -p:MdkBuildConfiguration=Release \
-  -p:MdkInteractive=no
 
 if [[ -z "$stage_dir" ]]; then
+  dotnet build "$repo_root/SEpedia.sln" \
+    --configuration Release \
+    --no-restore \
+    -p:MdkBuildConfiguration=Release \
+    -p:MdkInteractive=no
   exit 0
 fi
 
 package_dir="$stage_dir/SEpedia"
-[[ -d "$package_dir/Data/Scripts/SEpedia" ]] || fail "MDK package is missing Data/Scripts/SEpedia"
-[[ -f "$package_dir/Data/Scripts/SEpedia/SEpediaSession.cs" ]] || fail "MDK package is missing SEpediaSession.cs"
-[[ -f "$package_dir/Licenses/RichHudFramework.Client.LICENSE.txt" ]] || fail "MDK package is missing the Rich HUD client license"
-[[ -f "$package_dir/thumb.png" ]] || fail "MDK package is missing thumb.png"
-cmp --silent "$repo_root/thumb.png" "$package_dir/thumb.png" || fail "packaged thumbnail differs from generated thumb.png"
+scripts_dir="$package_dir/Data/Scripts/SEpedia"
+mkdir -p -- "$scripts_dir"
 
-# MDK uses these files to manage its output folder; the game and Workshop do not.
-rm -f -- "$package_dir/mdk.ini" "$package_dir/mdk.meta"
+while IFS= read -r -d '' source_file; do
+  relative_path=${source_file#./}
+  destination="$scripts_dir/$relative_path"
+  mkdir -p -- "$(dirname -- "$destination")"
+  cp -p -- "$repo_root/$relative_path" "$destination"
+done < <(
+  cd -- "$repo_root"
+  find . \
+    \( -type d \( -name '.git' -o -iname 'bin' -o -iname 'obj' \) \) -prune -o \
+    -type f -name '*.cs' ! -name '*.debug.cs' -print0
+)
+
+if [[ -d "$repo_root/Content" ]]; then
+  while IFS= read -r -d '' content_file; do
+    relative_path=${content_file#./}
+    destination="$package_dir/$relative_path"
+    mkdir -p -- "$(dirname -- "$destination")"
+    cp -p -- "$repo_root/Content/$relative_path" "$destination"
+  done < <(
+    cd -- "$repo_root/Content"
+    find . -type f ! -name '*.cs' -print0
+  )
+fi
+cp -p -- "$repo_root/thumb.png" "$package_dir/thumb.png"
+
+[[ -d "$package_dir/Data/Scripts/SEpedia" ]] || fail "package is missing Data/Scripts/SEpedia"
+[[ -f "$package_dir/Data/Scripts/SEpedia/SEpediaSession.cs" ]] || fail "package is missing SEpediaSession.cs"
+[[ -f "$package_dir/Licenses/RichHudFramework.Client.LICENSE.txt" ]] || fail "package is missing the Rich HUD client license"
+[[ -f "$package_dir/thumb.png" ]] || fail "package is missing thumb.png"
+cmp --silent "$repo_root/thumb.png" "$package_dir/thumb.png" || fail "packaged thumbnail differs from generated thumb.png"
 
 for ownership_file in metadata.mod modinfo.sbmi; do
   [[ ! -e "$package_dir/$ownership_file" ]] || fail "fresh package contains Workshop ownership file: $ownership_file"

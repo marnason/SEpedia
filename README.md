@@ -25,13 +25,12 @@ The project targets .NET Framework 4.8 and C# 6 through MDK². The repository pi
 ./scripts/deploy.sh
 ```
 
-`verify.sh` runs the script-sandbox guard, a locked restore, and a Debug build with MDK packaging disabled. `deploy.sh` calls the same Release packaging entry point used by GitHub Actions and deploys through the locally configured MDK destination. Every package build regenerates `thumb.png` from the pinned thumbnail generator and packages that fresh output. Do not invoke a bare MDK build in automation because its default behavior may open an interactive window.
+`verify.sh` runs the script-sandbox guard, a locked restore, and a Debug build with MDK packaging disabled. `deploy.sh` calls the shared packaging entry point in local MDK Release mode and deploys through the locally configured MDK destination. GitHub Actions calls the same entry point in source-only mode because Space Engineers compiles scripted mod source at runtime. Every package build regenerates `thumb.png` from the pinned thumbnail generator and packages that fresh output. Do not invoke a bare MDK build in automation because its default behavior may open an interactive window.
 
 For an isolated CI-style package, provide explicit reference, staging, and archive paths:
 
 ```bash
 ./scripts/package.sh \
-  --game-bin /path/to/SpaceEngineers/DedicatedServer64 \
   --stage /tmp/sepedia-package \
   --archive /tmp/SEpedia-1.0.0.zip
 ```
@@ -47,7 +46,7 @@ The repository has two release paths, both backed by `scripts/package.sh`:
 
 Before the first stable release, configure the repository Actions variable `STEAM_WORKSHOP_URL` with the full public SEpedia Workshop item URL. Stable publishing fails early when that variable is absent or invalid, and its release description begins with the Workshop installation link. Steam publication itself remains manual; the workflows neither request nor store Steam credentials.
 
-To bootstrap the Workshop listing, download a nightly archive, extract its `SEpedia/` folder into the local Mods directory, test it in game, and upload it with Space Engineers. Once the item exists, set `STEAM_WORKSHOP_URL` and dispatch the stable workflow.
+To bootstrap the Workshop listing, download a nightly archive, extract its `SEpedia/` folder into the local Mods directory, and upload it with Space Engineers. Once the item exists, set `STEAM_WORKSHOP_URL` and dispatch the stable workflow.
 
 ## Roadmap
 

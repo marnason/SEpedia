@@ -5,6 +5,7 @@ MUST and MUST NOT are requirements. SHOULD is the default unless repository evid
 ## Toolchain
 
 - SEpedia is a scripted C# Space Engineers mod built with MDK². Preserve the scaffold, analyzers, packager, references, and package versions unless the task requires changing them.
+- Space Engineers Workshop packages distribute scripted mod source, which the game compiles at runtime; compiled assemblies MUST NOT be released. Treat off-game compilation as an additional validation step that requires current Keen reference assemblies, not as a packaging requirement. Any CI acquisition of those proprietary references MUST be validated on a clean hosted runner and tolerate documented transient provider failures without caching or releasing the assemblies.
 - First-party code MUST remain compatible with .NET Framework 4.8 and C# 6 and MUST pass `scripts/check-script-sandbox.sh`. Do not suppress MDK diagnostics or use `#pragma warning`; the in-game compiler rejects prohibited members independently of local builds.
 - Use `SEpedia.sln`. Run routine verification through `scripts/verify.sh`, then finish every implementation change by running the single deployment entry point, `scripts/deploy.sh`. Do not automate a bare `dotnet build` because MDK may become interactive.
 - Portable code and guidance MUST NOT contain machine-specific paths, users, Steam roots, or deployment destinations.
