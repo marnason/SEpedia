@@ -1,0 +1,77 @@
+name: Steam mobile approval check
+
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  authenticate:
+    name: Test attended SteamCMD login
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Install SteamCMD from Valve
+        env:
+          STEAMCMD_ROOT: ${{ runner.temp }}/steamcmd
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends lib32gcc-s1
+          mkdir -p -- "$STEAMCMD_ROOT"
+          curl \
+            --fail \
+            --location \
+            --proto '=https' \
+            --show-error \
+            --silent \
+            --tlsv1.2 \
+            --output "$RUNNER_TEMP/steamcmd_linux.tar.gz" \
+            https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz
+          tar -xzf "$RUNNER_TEMP/steamcmd_linux.tar.gz" -C "$STEAMCMD_ROOT"
+          timeout --signal=TERM --kill-after=30s 5m \
+            "$STEAMCMD_ROOT/steamcmd.sh" \
+            +@ShutdownOnFailedCommand 1 \
+            +@NoPromptForPassword 1 \
+            +quit \
+            </dev/null
+
+      - name: Test mobile Steam Guard approval
+        env:
+          STEAM_PASSWORD: ${{ secrets.STEAM_PASSWORD }}
+          STEAM_USERNAME: ${{ secrets.STEAM_USERNAME }}
+          STEAMCMD_ROOT: ${{ runner.temp }}/steamcmd
+        shell: bash
+        run: |
+          [[ -n "$STEAM_USERNAME" ]] || {
+            echo "Repository secret STEAM_USERNAME is missing." >&2
+            exit 1
+          }
+          [[ -n "$STEAM_PASSWORD" ]] || {
+            echo "Repository secret STEAM_PASSWORD is missing." >&2
+            exit 1
+          }
+
+          echo "Approve the expected GitHub-hosted-runner login in the Steam mobile app."
+          set +e
+          timeout --signal=TERM --kill-after=30s 10m \
+            "$STEAMCMD_ROOT/steamcmd.sh" \
+            +@ShutdownOnFailedCommand 1 \
+            +@NoPromptForPassword 1 \
+            +login "$STEAM_USERNAME" "$STEAM_PASSWORD" \
+            +quit \
+            </dev/null
+          steam_status=$?
+          set -e
+
+          if [[ $steam_status -eq 124 || $steam_status -eq 137 ]]; then
+            echo "SteamCMD login was not approved within 10 minutes." >&2
+            exit 1
+          fi
+          if [[ $steam_status -ne 0 ]]; then
+            echo "SteamCMD login failed with exit code $steam_status." >&2
+            exit "$steam_status"
+          fi
+
+          echo "SteamCMD login succeeded; no Workshop content was modified."

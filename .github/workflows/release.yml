@@ -7,24 +7,29 @@ on:
         description: Semantic version without a leading v, for example 1.0.0
         required: true
         type: string
-      release_notes:
-        description: Optional notes to prepend before the generated changelog
-        required: false
-        default: ''
+      changelog:
+        description: Changelog published to both Steam Workshop and GitHub
+        required: true
         type: string
 
-permissions:
-  contents: write
+permissions: {}
 
 concurrency:
   group: stable-release
   cancel-in-progress: false
 
 jobs:
-  release:
-    name: Package and publish stable release
+  prepare:
+    name: Validate and package stable release
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    permissions:
+      contents: read
+    outputs:
+      archive: ${{ steps.release.outputs.archive }}
+      published_file_id: ${{ steps.release.outputs.published_file_id }}
+      tag: ${{ steps.release.outputs.tag }}
+      target_sha: ${{ steps.release.outputs.target_sha }}
 
     steps:
       - name: Check out latest main
@@ -37,13 +42,14 @@ jobs:
       - name: Validate release inputs
         id: release
         env:
+          CHANGELOG: ${{ inputs.changelog }}
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ inputs.version }}
           WORKSHOP_URL: ${{ vars.STEAM_WORKSHOP_URL }}
         shell: bash
         run: |
           semver='^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z]+([.-][0-9A-Za-z]+)*)?(\+[0-9A-Za-z]+([.-][0-9A-Za-z]+)*)?$'
-          workshop_url='^https://steamcommunity\.com/sharedfiles/filedetails/\?id=[0-9]+(&.*)?$'
+          workshop_url='^https://steamcommunity\.com/sharedfiles/filedetails/\?id=([0-9]+)$'
           [[ "$VERSION" =~ $semver ]] || {
             echo "Invalid semantic version: $VERSION" >&2
             exit 1
@@ -63,6 +69,20 @@ jobs:
             echo "Repository variable STEAM_WORKSHOP_URL is missing or invalid." >&2
             exit 1
           }
+          published_file_id=${BASH_REMATCH[1]}
+          [[ "$published_file_id" == '3784965557' ]] || {
+            echo "STEAM_WORKSHOP_URL must identify the SEpedia Workshop item (3784965557)." >&2
+            exit 1
+          }
+          python3 - <<'PY'
+          import os
+
+          changelog = os.environ["CHANGELOG"]
+          if "\0" in changelog:
+              raise SystemExit("Changelog must not contain NUL characters.")
+          if not changelog.strip():
+              raise SystemExit("Changelog must contain non-whitespace text.")
+          PY
 
           tag="v${VERSION}"
           if git ls-remote --exit-code --tags origin "refs/tags/${tag}" >/dev/null 2>&1; then
@@ -80,6 +100,7 @@ jobs:
             echo "tag=$tag"
             echo "target_sha=$target_sha"
             echo "archive=$archive"
+            echo "published_file_id=$published_file_id"
           } >> "$GITHUB_OUTPUT"
 
       - name: Set up .NET
@@ -96,42 +117,240 @@ jobs:
           cache: false
 
       - name: Assemble Workshop-ready package
+        env:
+          RELEASE_ARCHIVE: ${{ steps.release.outputs.archive }}
         shell: bash
         run: |
           ./scripts/package.sh \
-            --stage "$RUNNER_TEMP/package" \
-            --archive "$GITHUB_WORKSPACE/artifacts/${{ steps.release.outputs.archive }}"
+            --stage "$RUNNER_TEMP/release" \
+            --archive "$RUNNER_TEMP/release/${RELEASE_ARCHIVE}"
+
+      - name: Upload release handoff artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: stable-release-${{ github.run_id }}
+          path: ${{ runner.temp }}/release
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
+
+  workshop:
+    name: Publish to Steam Workshop
+    needs: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+
+    steps:
+      - name: Download release handoff artifact
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
+        with:
+          name: stable-release-${{ github.run_id }}
+          path: ${{ runner.temp }}/release
+
+      - name: Validate release handoff artifact
+        env:
+          RELEASE_ARCHIVE: ${{ needs.prepare.outputs.archive }}
+          RELEASE_ROOT: ${{ runner.temp }}/release
+        shell: bash
+        run: |
+          [[ -d "$RELEASE_ROOT/SEpedia/Data/Scripts/SEpedia" ]] || {
+            echo "Release artifact is missing the staged SEpedia source package." >&2
+            exit 1
+          }
+          [[ -f "$RELEASE_ROOT/SEpedia/thumb.png" ]] || {
+            echo "Release artifact is missing thumb.png." >&2
+            exit 1
+          }
+          [[ -f "$RELEASE_ROOT/$RELEASE_ARCHIVE" ]] || {
+            echo "Release artifact is missing $RELEASE_ARCHIVE." >&2
+            exit 1
+          }
+          [[ -f "$RELEASE_ROOT/$RELEASE_ARCHIVE.sha256" ]] || {
+            echo "Release artifact is missing $RELEASE_ARCHIVE.sha256." >&2
+            exit 1
+          }
+          (
+            cd -- "$RELEASE_ROOT"
+            sha256sum --check "$RELEASE_ARCHIVE.sha256"
+          )
+          if find "$RELEASE_ROOT/SEpedia" -type f \( \
+            -iname '*.dll' -o \
+            -iname '*.exe' -o \
+            -iname '*.pdb' -o \
+            -iname '*.so' -o \
+            -iname '*.dylib' \
+          \) -print -quit | grep -q .; then
+            echo "Release artifact contains a compiled binary." >&2
+            exit 1
+          fi
+
+      - name: Install SteamCMD from Valve
+        env:
+          STEAMCMD_ROOT: ${{ runner.temp }}/steamcmd
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends lib32gcc-s1
+          mkdir -p -- "$STEAMCMD_ROOT"
+          curl \
+            --fail \
+            --location \
+            --proto '=https' \
+            --show-error \
+            --silent \
+            --tlsv1.2 \
+            --output "$RUNNER_TEMP/steamcmd_linux.tar.gz" \
+            https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz
+          tar -xzf "$RUNNER_TEMP/steamcmd_linux.tar.gz" -C "$STEAMCMD_ROOT"
+          timeout --signal=TERM --kill-after=30s 5m \
+            "$STEAMCMD_ROOT/steamcmd.sh" \
+            +@ShutdownOnFailedCommand 1 \
+            +@NoPromptForPassword 1 \
+            +quit \
+            </dev/null
+
+      - name: Render Steam Workshop upload manifest
+        env:
+          CHANGELOG: ${{ inputs.changelog }}
+          PUBLISHED_FILE_ID: ${{ needs.prepare.outputs.published_file_id }}
+          RELEASE_ROOT: ${{ runner.temp }}/release
+          WORKSHOP_VDF: ${{ runner.temp }}/workshop-item.vdf
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+
+          def keyvalues_string(value):
+              if "\0" in value:
+                  raise SystemExit("Workshop manifest values must not contain NUL characters.")
+              return (value
+                      .replace("\\", "\\\\")
+                      .replace('"', '\\"')
+                      .replace("\t", "\\t")
+                      .replace("\r\n", "\n")
+                      .replace("\r", "\n")
+                      .replace("\n", "\\n"))
+
+          release_root = Path(os.environ["RELEASE_ROOT"]).resolve(strict=True)
+          content_folder = (release_root / "SEpedia").resolve(strict=True)
+          preview_file = (content_folder / "thumb.png").resolve(strict=True)
+          published_file_id = os.environ["PUBLISHED_FILE_ID"]
+          changelog = os.environ["CHANGELOG"]
+
+          if published_file_id != "3784965557":
+              raise SystemExit("Refusing to upload to an unexpected Workshop item.")
+          if not changelog.strip():
+              raise SystemExit("Changelog must contain non-whitespace text.")
+          if content_folder.parent != release_root:
+              raise SystemExit("Workshop content folder escaped the release artifact root.")
+          if preview_file.parent != content_folder:
+              raise SystemExit("Workshop preview escaped the content folder.")
+
+          values = {
+              "appid": "244850",
+              "publishedfileid": published_file_id,
+              "contentfolder": str(content_folder),
+              "previewfile": str(preview_file),
+              "changenote": changelog,
+          }
+          lines = ['"workshopitem"', "{"]
+          for key, value in values.items():
+              lines.append('    "{}"    "{}"'.format(key, keyvalues_string(value)))
+          lines.append("}")
+          Path(os.environ["WORKSHOP_VDF"]).write_text("\n".join(lines) + "\n", encoding="utf-8")
+          PY
+
+      - name: Upload package after mobile Steam Guard approval
+        env:
+          STEAM_PASSWORD: ${{ secrets.STEAM_PASSWORD }}
+          STEAM_USERNAME: ${{ secrets.STEAM_USERNAME }}
+          STEAMCMD_ROOT: ${{ runner.temp }}/steamcmd
+          WORKSHOP_VDF: ${{ runner.temp }}/workshop-item.vdf
+        shell: bash
+        run: |
+          [[ -n "$STEAM_USERNAME" ]] || {
+            echo "Repository secret STEAM_USERNAME is missing." >&2
+            exit 1
+          }
+          [[ -n "$STEAM_PASSWORD" ]] || {
+            echo "Repository secret STEAM_PASSWORD is missing." >&2
+            exit 1
+          }
+
+          echo "Approve the expected GitHub-hosted-runner login in the Steam mobile app."
+          set +e
+          timeout --signal=TERM --kill-after=30s 10m \
+            "$STEAMCMD_ROOT/steamcmd.sh" \
+            +@ShutdownOnFailedCommand 1 \
+            +@NoPromptForPassword 1 \
+            +login "$STEAM_USERNAME" "$STEAM_PASSWORD" \
+            +workshop_build_item "$WORKSHOP_VDF" \
+            +quit \
+            </dev/null
+          steam_status=$?
+          set -e
+
+          if [[ $steam_status -eq 124 || $steam_status -eq 137 ]]; then
+            echo "SteamCMD did not finish within 10 minutes." >&2
+            echo "Check the Workshop page before rerunning because the upload state may be ambiguous." >&2
+            exit 1
+          fi
+          if [[ $steam_status -ne 0 ]]; then
+            echo "SteamCMD failed with exit code $steam_status; no automatic retry will be attempted." >&2
+            echo "If upload progress was shown, check the Workshop page before rerunning." >&2
+            exit "$steam_status"
+          fi
+
+  github_release:
+    name: Create stable GitHub release
+    needs:
+      - prepare
+      - workshop
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download release handoff artifact
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
+        with:
+          name: stable-release-${{ github.run_id }}
+          path: ${{ runner.temp }}/release
 
       - name: Create stable GitHub release
         env:
+          CHANGELOG: ${{ inputs.changelog }}
           GH_TOKEN: ${{ github.token }}
-          RELEASE_ARCHIVE: ${{ steps.release.outputs.archive }}
-          RELEASE_NOTES: ${{ inputs.release_notes }}
-          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+          RELEASE_ARCHIVE: ${{ needs.prepare.outputs.archive }}
+          RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
           RELEASE_VERSION: ${{ inputs.version }}
-          TARGET_SHA: ${{ steps.release.outputs.target_sha }}
+          TARGET_SHA: ${{ needs.prepare.outputs.target_sha }}
           WORKSHOP_URL: ${{ vars.STEAM_WORKSHOP_URL }}
         shell: bash
         run: |
+          cd -- "$RUNNER_TEMP/release"
+          sha256sum --check "$RELEASE_ARCHIVE.sha256"
+
           notes=$(cat <<EOF
           ## Install SEpedia from Steam Workshop
 
           **[Open the SEpedia Steam Workshop page](${WORKSHOP_URL})**
 
           Steam Workshop is the primary distribution location for stable releases. The attached ZIP is provided for manual installation and verification.
-          EOF
-          )
-          if [[ -n "$RELEASE_NOTES" ]]; then
-            notes="${notes}
 
           ## Release notes
 
-          ${RELEASE_NOTES}"
-          fi
+          ${CHANGELOG}
+          EOF
+          )
 
           gh release create "$RELEASE_TAG" \
-            "artifacts/${RELEASE_ARCHIVE}#Workshop-ready mod archive" \
-            "artifacts/${RELEASE_ARCHIVE}.sha256#SHA-256 checksum" \
+            "$RELEASE_ARCHIVE#Workshop-ready mod archive" \
+            "$RELEASE_ARCHIVE.sha256#SHA-256 checksum" \
             --target "$TARGET_SHA" \
             --title "SEpedia ${RELEASE_VERSION}" \
             --notes "$notes" \

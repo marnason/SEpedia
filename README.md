@@ -42,11 +42,19 @@ The resulting ZIP contains one top-level `SEpedia/` folder ready to extract into
 The repository has two release paths, both backed by `scripts/package.sh`:
 
 - Every push to `main` creates a timestamped GitHub pre-release. Nightlies are retained on GitHub only and are never uploaded to Steam.
-- The **Stable release** workflow is started manually from GitHub Actions with a SemVer version and optional maintainer notes. It always packages the latest `main` commit and creates a normal GitHub Release marked as latest.
+- The **Stable release** workflow is started manually from GitHub Actions with a SemVer version and a required changelog. It packages the latest `main`, uploads that source package to the existing Steam Workshop item after attended mobile approval, and only then creates a normal GitHub Release marked as latest. The same changelog is published to Steam and GitHub.
 
-Before the first stable release, configure the repository Actions variable `STEAM_WORKSHOP_URL` with the full public SEpedia Workshop item URL. Stable publishing fails early when that variable is absent or invalid, and its release description begins with the Workshop installation link. Steam publication itself remains manual; the workflows neither request nor store Steam credentials.
+Configure these repository-level GitHub Actions settings before the first stable release:
 
-To bootstrap the Workshop listing, download a nightly archive, extract its `SEpedia/` folder into the local Mods directory, and upload it with Space Engineers. Once the item exists, set `STEAM_WORKSHOP_URL` and dispatch the stable workflow.
+- Variable `STEAM_WORKSHOP_URL`: `https://steamcommunity.com/sharedfiles/filedetails/?id=3784965557`
+- Secret `STEAM_USERNAME`: the username of the Steam account allowed to update the item
+- Secret `STEAM_PASSWORD`: that account's password
+
+Do not configure an authenticator shared secret or a reusable Steam session. Steam Guard remains in the official mobile app. Before enabling live publication, manually run **Steam mobile approval check** on a GitHub-hosted runner and approve its expected login notification from the phone. This login-only workflow has closed terminal input, waits up to ten minutes, modifies no Workshop content, and retains no session after its ephemeral runner is discarded.
+
+For a stable release, start **Stable release** while available to approve the new hosted-runner login from the Steam mobile app. SteamCMD is explicitly non-interactive: it cannot fall back to asking for a password, QR scan, or Steam Guard code. Declined, missing, or timed-out approval stops the workflow before it creates a GitHub Release.
+
+Workshop uploads are never retried automatically. If SteamCMD reports an ambiguous timeout or network failure after showing upload progress, inspect the [SEpedia Workshop item](https://steamcommunity.com/sharedfiles/filedetails/?id=3784965557) before rerunning anything. If Steam succeeds but GitHub Release creation fails, use GitHub's **Re-run failed jobs** operation so only the GitHub Release job is retried; rerunning all jobs would submit the Workshop update again.
 
 ## Roadmap
 
