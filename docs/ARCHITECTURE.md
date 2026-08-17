@@ -8,7 +8,7 @@ Cleanup runs in reverse ownership order and is idempotent. The window closes tex
 
 ## Definition and catalog flow
 
-`DefinitionIndexBuilder` enumerates the primary and blueprint registries. `DefinitionRelationships` derives build-menu, production-menu, variant, and block-pair relationships before `DefinitionExtractors` creates Rich-HUD-independent documents. `DefinitionIndex` then sorts documents and builds the recipe and component-usage lookups.
+`DefinitionIndexBuilder` enumerates the primary and blueprint registries. `DefinitionRelationships` derives G-menu reachability from both the All Blocks view and eligible block categories, then applies variant and block-pair relationships before `DefinitionExtractors` creates Rich-HUD-independent documents. `DefinitionIndex` then sorts documents and builds the recipe and component-usage lookups.
 
 Failures at game or mod-data boundaries are isolated and summarized by `DefinitionBuildDiagnostics`. Extractors do not mutate relationship indexes.
 

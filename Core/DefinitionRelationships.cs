@@ -130,13 +130,40 @@ namespace SEpedia.Core
             bool survivalMode,
             DefinitionBuildDiagnostics diagnostics)
         {
-            var reachable = new HashSet<MyDefinitionId>();
+            var blocks = new List<MyCubeBlockDefinition>();
 
             for (int index = 0; index < definitions.Count; index++)
             {
                 MyCubeBlockDefinition block = definitions[index] as MyCubeBlockDefinition;
-                if (block == null)
-                    continue;
+                if (block != null)
+                    blocks.Add(block);
+            }
+
+            HashSet<MyDefinitionId> reachable = BuildAllBlocksReachability(
+                manager,
+                blocks,
+                survivalMode,
+                diagnostics);
+            reachable.UnionWith(BuildCategoryReachability(
+                manager,
+                blocks,
+                survivalMode,
+                diagnostics));
+            ExpandDefinitionPairs(manager, reachable, diagnostics);
+            return reachable;
+        }
+
+        private static HashSet<MyDefinitionId> BuildAllBlocksReachability(
+            MyDefinitionManager manager,
+            IList<MyCubeBlockDefinition> blocks,
+            bool survivalMode,
+            DefinitionBuildDiagnostics diagnostics)
+        {
+            var reachable = new HashSet<MyDefinitionId>();
+
+            for (int index = 0; index < blocks.Count; index++)
+            {
+                MyCubeBlockDefinition block = blocks[index];
 
                 try
                 {
@@ -187,6 +214,74 @@ namespace SEpedia.Core
                 diagnostics.Report("build-menu-variants", "Could not enumerate variant groups", exception);
             }
 
+            return reachable;
+        }
+
+        private static HashSet<MyDefinitionId> BuildCategoryReachability(
+            MyDefinitionManager manager,
+            IList<MyCubeBlockDefinition> blocks,
+            bool survivalMode,
+            DefinitionBuildDiagnostics diagnostics)
+        {
+            var reachable = new HashSet<MyDefinitionId>();
+
+            try
+            {
+                Dictionary<string, MyGuiBlockCategoryDefinition> categories = manager.GetCategories();
+                foreach (KeyValuePair<string, MyGuiBlockCategoryDefinition> pair in categories)
+                {
+                    try
+                    {
+                        MyGuiBlockCategoryDefinition category = pair.Value;
+                        if (!IsEligibleBlockCategory(category, survivalMode) ||
+                            category.ItemIds == null || category.ItemIds.Count == 0)
+                            continue;
+
+                        for (int blockIndex = 0; blockIndex < blocks.Count; blockIndex++)
+                        {
+                            MyCubeBlockDefinition block = blocks[blockIndex];
+                            // Direct category membership remains authoritative
+                            // even when GuiVisible is false. Non-strict variant
+                            // widening is already represented by the All Blocks
+                            // variant-group path.
+                            if (category.HasItem(block.Id.ToString()))
+                                reachable.Add(block.Id);
+                        }
+                    }
+                    catch (Exception exception)
+                    {
+                        diagnostics.Report(
+                            "build-menu-category",
+                            "Skipped block category " + pair.Key,
+                            exception);
+                    }
+                }
+            }
+            catch (Exception exception)
+            {
+                diagnostics.Report("build-menu-categories", "Could not enumerate block categories", exception);
+            }
+
+            return reachable;
+        }
+
+        private static bool IsEligibleBlockCategory(
+            MyGuiBlockCategoryDefinition category,
+            bool survivalMode)
+        {
+            // Vanilla's block-category list checks the category kind and the
+            // session-specific visibility flags. Disabled definitions have
+            // already been removed from the merged category registry.
+            return category != null && category.IsBlockCategory &&
+                (!survivalMode || category.AvailableInSurvival) &&
+                (survivalMode || category.ShowInCreative);
+        }
+
+        private static void ExpandDefinitionPairs(
+            MyDefinitionManager manager,
+            HashSet<MyDefinitionId> reachable,
+            DefinitionBuildDiagnostics diagnostics)
+        {
             try
             {
                 DictionaryReader<string, MyCubeBlockDefinitionGroup> pairs = manager.GetDefinitionPairs();
@@ -218,8 +313,6 @@ namespace SEpedia.Core
             {
                 diagnostics.Report("build-menu-pairs", "Could not enumerate block pairs", exception);
             }
-
-            return reachable;
         }
 
         #endregion

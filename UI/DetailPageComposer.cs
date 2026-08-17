@@ -114,7 +114,7 @@ namespace SEpedia.UI
             AddField(rows, "Grid size", block.CubeSize.ToString());
             AddField(rows, "Dimensions", block.Size.X + " × " + block.Size.Y + " × " + block.Size.Z);
             AddField(rows, "PCU", block.Pcu.ToString());
-            AddField(rows, "G-menu reachable", YesNo(block.IsBuildMenuReachable));
+            AddField(rows, "Listed in G menu", YesNo(block.IsBuildMenuReachable));
             if (!string.IsNullOrWhiteSpace(block.BlockPairName))
                 AddField(rows, "Block pair", block.BlockPairName);
             if (block.RelatedBlocks.Count > 0)
