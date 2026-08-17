@@ -99,6 +99,20 @@ jobs:
           cd -- "$RUNNER_TEMP/release"
           sha256sum --check "$RELEASE_ARCHIVE.sha256"
 
+          retry() {
+            local attempt
+            for attempt in 1 2 3 4; do
+              if "$@"; then
+                return 0
+              fi
+              if [[ $attempt -lt 4 ]]; then
+                echo "::warning::GitHub API request failed; retrying ($attempt/4)."
+                sleep $((attempt * 5))
+              fi
+            done
+            return 1
+          }
+
           notes=$(cat <<EOF
           > [!WARNING]
           > This is an automated GitHub-only nightly build. It has not been published to Steam Workshop and may be unstable.
@@ -109,24 +123,67 @@ jobs:
           EOF
           )
 
-          mapfile -t previous_tags < <(
+          previous_tag_output=$(retry \
             gh release list \
               --limit 100 \
               --json name,tagName \
-              --jq '.[] | select(.name == "nightly") | .tagName'
-          )
+              --jq '.[] | select(.name == "nightly") | .tagName')
+          previous_tags=()
+          if [[ -n "$previous_tag_output" ]]; then
+            mapfile -t previous_tags <<< "$previous_tag_output"
+          fi
 
-          gh release create "$RELEASE_VERSION" \
-            "$RELEASE_ARCHIVE#Workshop-ready mod archive" \
-            "$RELEASE_ARCHIVE.sha256#SHA-256 checksum" \
-            --target "$TARGET_SHA" \
-            --title "nightly" \
-            --notes "$notes" \
-            --generate-notes \
-            --latest=false
+          ensure_draft_release() {
+            local is_draft
+            if is_draft=$(gh release view "$RELEASE_VERSION" --json isDraft --jq '.isDraft' 2>/dev/null); then
+              [[ "$is_draft" == "true" || "$is_draft" == "false" ]]
+              return
+            fi
+            gh release create "$RELEASE_VERSION" \
+              --draft \
+              --target "$TARGET_SHA" \
+              --title "nightly" \
+              --notes "$notes" \
+              --generate-notes
+          }
+
+          upload_release_assets() {
+            local is_draft
+            is_draft=$(gh release view "$RELEASE_VERSION" --json isDraft --jq '.isDraft') || return
+            if [[ "$is_draft" == "false" ]]; then
+              return 0
+            fi
+            gh release upload "$RELEASE_VERSION" \
+              "$RELEASE_ARCHIVE#Workshop-ready mod archive" \
+              "$RELEASE_ARCHIVE.sha256#SHA-256 checksum" \
+              --clobber
+          }
+
+          verify_release_assets() {
+            local assets
+            assets=$(gh release view "$RELEASE_VERSION" --json assets --jq '.assets[].name') || return
+            grep -Fxq "$RELEASE_ARCHIVE" <<< "$assets" &&
+              grep -Fxq "$RELEASE_ARCHIVE.sha256" <<< "$assets"
+          }
+
+          publish_release() {
+            local is_draft
+            is_draft=$(gh release view "$RELEASE_VERSION" --json isDraft --jq '.isDraft') || return
+            if [[ "$is_draft" == "false" ]]; then
+              return 0
+            fi
+            gh release edit "$RELEASE_VERSION" --draft=false --latest=false
+          }
+
+          retry ensure_draft_release
+          retry upload_release_assets
+          retry verify_release_assets
+          retry publish_release
 
           for previous_tag in "${previous_tags[@]}"; do
             if [[ "$previous_tag" != "$RELEASE_VERSION" ]]; then
-              gh release delete "$previous_tag" --cleanup-tag --yes
+              if ! retry gh release delete "$previous_tag" --cleanup-tag --yes; then
+                echo "::warning::Published the replacement but could not prune $previous_tag."
+              fi
             fi
           done
