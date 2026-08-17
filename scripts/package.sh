@@ -3,7 +3,7 @@ set -euo pipefail
 
 script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 repo_root=$(cd -- "$script_dir/.." && pwd)
-thumbnail_module="github.com/marnason/se-mod-thumbnails/cmd/thumbnail@3e6e2e55b896abe19a7e9fb43776fb58a8cf63ef"
+thumbnail_module="github.com/marnason/se-mod-thumbnails/cmd/thumbnail@main"
 
 stage_dir=""
 archive_path=""
@@ -160,8 +160,8 @@ if len(data) >= 1024 * 1024:
 if data[:8] != b"\x89PNG\r\n\x1a\n" or data[12:16] != b"IHDR":
     raise SystemExit("package: thumb.png is not a valid PNG")
 width, height = struct.unpack(">II", data[16:24])
-if (width, height) != (720, 450):
-    raise SystemExit("package: thumb.png must be 720x450, got %dx%d" % (width, height))
+if (width, height) != (1280, 720):
+    raise SystemExit("package: thumb.png must be 1280x720, got %dx%d" % (width, height))
 PY
 
 if [[ -z "$archive_path" ]]; then

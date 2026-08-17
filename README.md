@@ -25,7 +25,7 @@ The project targets .NET Framework 4.8 and C# 6 through MDK². The repository pi
 ./scripts/deploy.sh
 ```
 
-`verify.sh` runs the script-sandbox guard, a locked restore, and a Debug build with MDK packaging disabled. `deploy.sh` calls the shared packaging entry point in local MDK Release mode and deploys through the locally configured MDK destination. GitHub Actions calls the same entry point in source-only mode because Space Engineers compiles scripted mod source at runtime. Every package build regenerates `thumb.png` from the pinned thumbnail generator and packages that fresh output. Do not invoke a bare MDK build in automation because its default behavior may open an interactive window.
+`verify.sh` runs the script-sandbox guard, a locked restore, and a Debug build with MDK packaging disabled. `deploy.sh` calls the shared packaging entry point in local MDK Release mode and deploys through the locally configured MDK destination. GitHub Actions calls the same entry point in source-only mode because Space Engineers compiles scripted mod source at runtime. Every package build regenerates `thumb.png` from the thumbnail generator's current `main` branch and packages that fresh output. Do not invoke a bare MDK build in automation because its default behavior may open an interactive window.
 
 For an isolated CI-style package, provide explicit reference, staging, and archive paths:
 
