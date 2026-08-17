@@ -42,7 +42,7 @@ The resulting ZIP contains one top-level `SEpedia/` folder ready to extract into
 
 The repository has two release paths, both backed by `scripts/package.sh`:
 
-- Every push to `main` creates a uniquely tagged, timestamped GitHub pre-release. Nightlies are retained on GitHub only and are never uploaded to Steam.
+- Every push to `main` creates a timestamped GitHub pre-release. Nightlies are retained on GitHub only and are never uploaded to Steam.
 - The **Stable release** workflow is started manually from GitHub Actions with a SemVer version and optional maintainer notes. It always packages the latest `main` commit and creates a normal GitHub Release marked as latest.
 
 Before the first stable release, configure the repository Actions variable `STEAM_WORKSHOP_URL` with the full public SEpedia Workshop item URL. Stable publishing fails early when that variable is absent or invalid, and its release description begins with the Workshop installation link. Steam publication itself remains manual; the workflows neither request nor store Steam credentials.

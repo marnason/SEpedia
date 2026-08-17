@@ -44,11 +44,9 @@ jobs:
         shell: bash
         run: |
           timestamp=$(date -u +'%Y-%m-%d-%H%M')
-          short_sha=${GITHUB_SHA:0:7}
-          tag="nightly-${timestamp}-${short_sha}-${GITHUB_RUN_ID}"
+          tag="nightly-${timestamp}"
           archive="SEpedia-${timestamp}.zip"
           {
-            echo "version=$timestamp"
             echo "tag=$tag"
             echo "archive=$archive"
           } >> "$GITHUB_OUTPUT"
@@ -90,7 +88,6 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ steps.release.outputs.tag }}
-          RELEASE_VERSION: ${{ steps.release.outputs.version }}
           RELEASE_ARCHIVE: ${{ steps.release.outputs.archive }}
         shell: bash
         run: |
@@ -105,7 +102,7 @@ jobs:
             "artifacts/${RELEASE_ARCHIVE}#Workshop-ready mod archive" \
             "artifacts/${RELEASE_ARCHIVE}.sha256#SHA-256 checksum" \
             --target "$GITHUB_SHA" \
-            --title "SEpedia Nightly ${RELEASE_VERSION}" \
+            --title "nightly" \
             --notes "$notes" \
             --generate-notes \
             --prerelease \
