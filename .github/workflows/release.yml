@@ -262,10 +262,8 @@ jobs:
               return (value
                       .replace("\\", "\\\\")
                       .replace('"', '\\"')
-                      .replace("\t", "\\t")
                       .replace("\r\n", "\n")
-                      .replace("\r", "\n")
-                      .replace("\n", "\\n"))
+                      .replace("\r", "\n"))
 
           release_root = Path(os.environ["RELEASE_ROOT"]).resolve(strict=True)
           content_folder = (release_root / "SEpedia").resolve(strict=True)
@@ -283,12 +281,17 @@ jobs:
           if preview_file.parent != content_folder:
               raise SystemExit("Workshop preview escaped the content folder.")
 
+          changenote = release_tag + "\n" + changelog
+          encoded_changenote = keyvalues_string(changenote)
+          if not encoded_changenote.startswith(release_tag + "\n"):
+              raise SystemExit("Workshop changenote must contain a literal newline after the version.")
+
           values = {
               "appid": "244850",
               "publishedfileid": published_file_id,
               "contentfolder": str(content_folder),
               "previewfile": str(preview_file),
-              "changenote": release_tag + "\n" + changelog,
+              "changenote": changenote,
           }
           lines = ['"workshopitem"', "{"]
           for key, value in values.items():
