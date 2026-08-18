@@ -4,11 +4,12 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: Semantic version without a leading v, for example 1.0.0
-        required: true
+        description: Semantic version without a leading v, for example 1.0.0. Leave empty to auto-increment patch.
+        required: false
         type: string
       changelog:
         description: Changelog published to both Steam Workshop and GitHub
+        default: '・'
         required: true
         type: string
 
@@ -30,6 +31,7 @@ jobs:
       published_file_id: ${{ steps.release.outputs.published_file_id }}
       tag: ${{ steps.release.outputs.tag }}
       target_sha: ${{ steps.release.outputs.target_sha }}
+      version: ${{ steps.release.outputs.version }}
 
     steps:
       - name: Check out latest main
@@ -43,6 +45,7 @@ jobs:
         id: release
         env:
           CHANGELOG: ${{ inputs.changelog }}
+          GH_REPO: ${{ github.repository }}
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ inputs.version }}
           WORKSHOP_URL: ${{ vars.STEAM_WORKSHOP_URL }}
@@ -50,6 +53,23 @@ jobs:
         run: |
           semver='^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z]+([.-][0-9A-Za-z]+)*)?(\+[0-9A-Za-z]+([.-][0-9A-Za-z]+)*)?$'
           workshop_url='^https://steamcommunity\.com/sharedfiles/filedetails/\?id=([0-9]+)$'
+          if [[ -z "$VERSION" ]]; then
+            latest_version=$(gh release list \
+              --limit 100 \
+              --exclude-drafts \
+              --exclude-pre-releases \
+              --json tagName \
+              --jq '.[].tagName' \
+              | sed -nE 's/^v((0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*))$/\1/p' \
+              | sort --version-sort \
+              | tail -n 1)
+            if [[ -z "$latest_version" ]]; then
+              VERSION='0.0.1'
+            else
+              IFS='.' read -r major minor patch <<< "$latest_version"
+              VERSION="${major}.${minor}.$((patch + 1))"
+            fi
+          fi
           [[ "$VERSION" =~ $semver ]] || {
             echo "Invalid semantic version: $VERSION" >&2
             exit 1
@@ -101,6 +121,7 @@ jobs:
             echo "target_sha=$target_sha"
             echo "archive=$archive"
             echo "published_file_id=$published_file_id"
+            echo "version=$VERSION"
           } >> "$GITHUB_OUTPUT"
 
       - name: Set up .NET
@@ -215,6 +236,7 @@ jobs:
         env:
           CHANGELOG: ${{ inputs.changelog }}
           PUBLISHED_FILE_ID: ${{ needs.prepare.outputs.published_file_id }}
+          RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
           RELEASE_ROOT: ${{ runner.temp }}/release
           WORKSHOP_VDF: ${{ runner.temp }}/workshop-item.vdf
         shell: bash
@@ -238,6 +260,7 @@ jobs:
           content_folder = (release_root / "SEpedia").resolve(strict=True)
           preview_file = (content_folder / "thumb.png").resolve(strict=True)
           published_file_id = os.environ["PUBLISHED_FILE_ID"]
+          release_tag = os.environ["RELEASE_TAG"]
           changelog = os.environ["CHANGELOG"]
 
           if published_file_id != "3784965557":
@@ -254,7 +277,7 @@ jobs:
               "publishedfileid": published_file_id,
               "contentfolder": str(content_folder),
               "previewfile": str(preview_file),
-              "changenote": changelog,
+              "changenote": release_tag + "\n" + changelog,
           }
           lines = ['"workshopitem"', "{"]
           for key, value in values.items():
@@ -321,6 +344,22 @@ jobs:
           name: stable-release-${{ github.run_id }}
           path: ${{ runner.temp }}/release
 
+      - name: Delete existing nightly release
+        env:
+          GH_REPO: ${{ github.repository }}
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          nightly_tags=$(gh release list \
+            --limit 100 \
+            --json name,tagName \
+            --jq '.[] | select(.name == "nightly") | .tagName')
+          while IFS= read -r nightly_tag; do
+            if [[ -n "$nightly_tag" ]]; then
+              gh release delete "$nightly_tag" --cleanup-tag --yes
+            fi
+          done <<< "$nightly_tags"
+
       - name: Create stable GitHub release
         env:
           CHANGELOG: ${{ inputs.changelog }}
@@ -328,7 +367,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           RELEASE_ARCHIVE: ${{ needs.prepare.outputs.archive }}
           RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
-          RELEASE_VERSION: ${{ inputs.version }}
+          RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
           TARGET_SHA: ${{ needs.prepare.outputs.target_sha }}
           WORKSHOP_URL: ${{ vars.STEAM_WORKSHOP_URL }}
         shell: bash
