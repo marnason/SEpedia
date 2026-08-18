@@ -7,6 +7,7 @@ thumbnail_module="github.com/marnason/se-mod-thumbnails/cmd/thumbnail@main"
 
 stage_dir=""
 archive_path=""
+package_version=""
 
 usage() {
   cat <<'EOF'
@@ -17,6 +18,7 @@ Build or package SEpedia.
 Options:
   --stage PATH     Assemble a source-only Workshop package for CI.
   --archive PATH   ZIP path to create from the staged SEpedia folder.
+  --version VALUE  Include VALUE as the packaged release version.
   -h, --help       Show this help.
 
 With no options, the script uses the developer's ignored MDK local settings and
@@ -43,6 +45,11 @@ while (($# > 0)); do
       archive_path=$2
       shift 2
       ;;
+    --version)
+      (($# >= 2)) || fail "--version requires a value"
+      package_version=$2
+      shift 2
+      ;;
     -h|--help)
       usage
       exit 0
@@ -55,6 +62,9 @@ done
 
 if [[ -n "$archive_path" && -z "$stage_dir" ]]; then
   fail "--archive requires --stage"
+fi
+if [[ -n "$package_version" && -z "$stage_dir" ]]; then
+  fail "--version requires --stage"
 fi
 
 for command_name in dotnet go; do
@@ -119,11 +129,17 @@ if [[ -d "$repo_root/Content" ]]; then
   )
 fi
 cp -p -- "$repo_root/thumb.png" "$package_dir/thumb.png"
+if [[ -n "$package_version" ]]; then
+  printf '%s\n' "$package_version" > "$package_dir/version.txt"
+fi
 
 [[ -d "$package_dir/Data/Scripts/SEpedia" ]] || fail "package is missing Data/Scripts/SEpedia"
 [[ -f "$package_dir/Data/Scripts/SEpedia/SEpediaSession.cs" ]] || fail "package is missing SEpediaSession.cs"
 [[ -f "$package_dir/Licenses/RichHudFramework.Client.LICENSE.txt" ]] || fail "package is missing the Rich HUD client license"
 [[ -f "$package_dir/thumb.png" ]] || fail "package is missing thumb.png"
+if [[ -n "$package_version" ]]; then
+  [[ "$(< "$package_dir/version.txt")" == "$package_version" ]] || fail "packaged version differs from requested version"
+fi
 cmp --silent "$repo_root/thumb.png" "$package_dir/thumb.png" || fail "packaged thumbnail differs from generated thumb.png"
 
 for ownership_file in metadata.mod modinfo.sbmi; do

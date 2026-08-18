@@ -140,14 +140,16 @@ jobs:
       - name: Assemble Workshop-ready package
         env:
           RELEASE_ARCHIVE: ${{ steps.release.outputs.archive }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
         shell: bash
         run: |
           ./scripts/package.sh \
             --stage "$RUNNER_TEMP/release" \
-            --archive "$RUNNER_TEMP/release/${RELEASE_ARCHIVE}"
+            --archive "$RUNNER_TEMP/release/${RELEASE_ARCHIVE}" \
+            --version "$RELEASE_TAG"
 
       - name: Upload release handoff artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: stable-release-${{ github.run_id }}
           path: ${{ runner.temp }}/release
@@ -165,7 +167,7 @@ jobs:
 
     steps:
       - name: Download release handoff artifact
-        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: stable-release-${{ github.run_id }}
           path: ${{ runner.temp }}/release
@@ -174,6 +176,7 @@ jobs:
         env:
           RELEASE_ARCHIVE: ${{ needs.prepare.outputs.archive }}
           RELEASE_ROOT: ${{ runner.temp }}/release
+          RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
         shell: bash
         run: |
           [[ -d "$RELEASE_ROOT/SEpedia/Data/Scripts/SEpedia" ]] || {
@@ -182,6 +185,14 @@ jobs:
           }
           [[ -f "$RELEASE_ROOT/SEpedia/thumb.png" ]] || {
             echo "Release artifact is missing thumb.png." >&2
+            exit 1
+          }
+          [[ -f "$RELEASE_ROOT/SEpedia/version.txt" ]] || {
+            echo "Release artifact is missing version.txt." >&2
+            exit 1
+          }
+          [[ "$(< "$RELEASE_ROOT/SEpedia/version.txt")" == "$RELEASE_TAG" ]] || {
+            echo "Release artifact contains an unexpected version." >&2
             exit 1
           }
           [[ -f "$RELEASE_ROOT/$RELEASE_ARCHIVE" ]] || {
@@ -288,12 +299,32 @@ jobs:
 
       - name: Upload package after mobile Steam Guard approval
         env:
+          PUBLISHED_FILE_ID: ${{ needs.prepare.outputs.published_file_id }}
           STEAM_PASSWORD: ${{ secrets.STEAM_PASSWORD }}
           STEAM_USERNAME: ${{ secrets.STEAM_USERNAME }}
           STEAMCMD_ROOT: ${{ runner.temp }}/steamcmd
           WORKSHOP_VDF: ${{ runner.temp }}/workshop-item.vdf
         shell: bash
         run: |
+          workshop_updated_at() {
+            curl \
+              --fail \
+              --silent \
+              --show-error \
+              --data 'itemcount=1' \
+              --data "publishedfileids[0]=${PUBLISHED_FILE_ID}" \
+              https://api.steampowered.com/ISteamRemoteStorage/GetPublishedFileDetails/v1/ \
+              | python3 -c '
+          import json
+          import sys
+
+          item = json.load(sys.stdin)["response"]["publishedfiledetails"][0]
+          if item.get("result") != 1:
+              raise SystemExit("Steam Workshop item lookup failed.")
+          print(item["time_updated"])
+          '
+          }
+
           [[ -n "$STEAM_USERNAME" ]] || {
             echo "Repository secret STEAM_USERNAME is missing." >&2
             exit 1
@@ -303,6 +334,7 @@ jobs:
             exit 1
           }
 
+          previous_updated_at=$(workshop_updated_at)
           echo "Approve the expected GitHub-hosted-runner login in the Steam mobile app."
           set +e
           timeout --signal=TERM --kill-after=30s 10m \
@@ -327,6 +359,20 @@ jobs:
             exit "$steam_status"
           fi
 
+          for attempt in {1..12}; do
+            if current_updated_at=$(workshop_updated_at) &&
+              [[ "$current_updated_at" =~ ^[0-9]+$ ]] &&
+              ((current_updated_at > previous_updated_at)); then
+              echo "Steam Workshop update is publicly visible."
+              exit 0
+            fi
+            if [[ $attempt -lt 12 ]]; then
+              sleep 10
+            fi
+          done
+          echo "SteamCMD reported success, but the Workshop update time did not advance." >&2
+          exit 1
+
   github_release:
     name: Create stable GitHub release
     needs:
@@ -339,7 +385,7 @@ jobs:
 
     steps:
       - name: Download release handoff artifact
-        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: stable-release-${{ github.run_id }}
           path: ${{ runner.temp }}/release

@@ -1,5 +1,5 @@
 # SEpedia
-[![badge](https://shieldcn.dev/badge/vibecoded%20with-Codex.svg?mode=light&logo=ri%3ABsOpenai&logoColor=ffffff&brand=openai)](https://superintelligence-statement.org/) ![built in Faroe Islands](https://shieldcn.dev/flag/fo.svg)
+[![vibecoded](https://shieldcn.dev/badge/vibecoded%20with-Codex.svg?mode=light&logo=ri%3ABsOpenai&logoColor=ffffff&brand=openai)](https://superintelligence-statement.org/) [![badge](https://shieldcn.dev/badge/Buy%20me-a%20morsel-72a4f2.svg?logo=kofi&logoColor=ff5a16&valueColor=202020&labelTextColor=424242)](https://ko-fi.com/marnason) ![built in Faroe Islands](https://shieldcn.dev/flag/fo.svg)
 
 Ever stared at a component and wondered what builds it, what it builds, or which of your forty-seven mods added it? SEpedia puts a searchable encyclopedia inside Space Engineers, so the answers are never far from the cockpit.
 
