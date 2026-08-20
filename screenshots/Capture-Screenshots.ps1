@@ -174,9 +174,9 @@ function Save-GameScreenshot {
     )
 
     # Fixed framing for every screenshot, relative to the game window.
-    $captureOffsetX = 740
+    $captureOffsetX = 640
     $captureOffsetY = 360
-    $captureWidth = 2360
+    $captureWidth = 2560
     $captureHeight = 1440
 
     if ([System.IO.Path]::GetFileName($FileName) -ne $FileName) {
@@ -212,18 +212,18 @@ function Save-GameScreenshot {
 }
 
 Start-Sleep -Milliseconds 2000
-Click-GamePosition 1300 450
+Click-GamePosition 1200 450
 Start-Sleep -Milliseconds 400
-Click-GamePosition 900 1120
+Click-GamePosition 800 1120
 Start-Sleep -Milliseconds 400
-Move-GameCursor 2340 1200
+Move-GameCursor 2240 1200
 Start-Sleep -Milliseconds 400
 Save-GameScreenshot '01-ingots.png'
 
 
 Start-Sleep -Milliseconds 400
-Click-GamePosition 2340 1200
+Click-GamePosition 2240 1200
 Start-Sleep -Milliseconds 400
-Move-GameCursor 3400 1900
+Move-GameCursor 3300 1900
 Start-Sleep -Milliseconds 400
 Save-GameScreenshot '02-rocket.png'

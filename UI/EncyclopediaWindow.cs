@@ -106,7 +106,7 @@ namespace SEpedia.UI
             BodyColor = new Color(31, 40, 47, 245);
             BorderColor = new Color(58, 68, 77);
             MinimumSize = new Vector2(840f, 520f);
-            Size = new Vector2(1180f, 720f);
+            Size = new Vector2(1280f, 720f);
             MouseInput.RequestCursor = true;
             Visible = false;
 
