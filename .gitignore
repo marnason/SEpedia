@@ -89,3 +89,7 @@ modinfo.sbmi
 /Place your code files here
 /Content/Data/SBC files can go here
 /Content/Other content folders
+
+# Generated screenshots; keep the capture script
+/screenshots/*
+!/screenshots/Capture-Screenshots.ps1
