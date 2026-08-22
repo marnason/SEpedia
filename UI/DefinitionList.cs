@@ -11,7 +11,7 @@ namespace SEpedia.UI
     {
         #region State
 
-        public event Action<CatalogEntry> SelectionChanged;
+        public event Action<CatalogEntry, bool> SelectionChanged;
         public event Action FilterRequested;
         public event Action ResetFiltersRequested;
         public event Action ResultsChanged;
@@ -242,7 +242,7 @@ namespace SEpedia.UI
             UpdateActiveFilterStatus();
 
             if (list.Value != null)
-                RaiseSelectionChanged(list.Value.AssocMember);
+                RaiseSelectionChanged(list.Value.AssocMember, false);
 
             Action resultsHandler = ResultsChanged;
             if (resultsHandler != null)
@@ -341,14 +341,31 @@ namespace SEpedia.UI
             {
                 CatalogEntry entry = list.EntryList[index].AssocMember;
                 if (entry.Definition != null && entry.Definition.Id == definition.Id)
-                {
-                    list.SetSelectionAt(index);
-                    pendingRevealIndex = index;
-                    revealLayoutReady = false;
-                    return true;
-                }
+                    return TrySelectAt(index);
             }
             return false;
+        }
+
+        public bool TrySelect(CatalogEntry target)
+        {
+            if (target == null)
+                return false;
+
+            for (int index = 0; index < list.EntryList.Count; index++)
+            {
+                CatalogEntry entry = list.EntryList[index].AssocMember;
+                if (entry.StableKey == target.StableKey)
+                    return TrySelectAt(index);
+            }
+            return false;
+        }
+
+        private bool TrySelectAt(int index)
+        {
+            list.SetSelectionAt(index);
+            pendingRevealIndex = index;
+            revealLayoutReady = false;
+            return true;
         }
 
         public bool TryReveal(DefinitionDocument definition)
@@ -387,14 +404,14 @@ namespace SEpedia.UI
         private void OnSelectionChanged(object sender, EventArgs args)
         {
             if (!updating && list.Value != null)
-                RaiseSelectionChanged(list.Value.AssocMember);
+                RaiseSelectionChanged(list.Value.AssocMember, true);
         }
 
-        private void RaiseSelectionChanged(CatalogEntry entry)
+        private void RaiseSelectionChanged(CatalogEntry entry, bool explicitSelection)
         {
-            Action<CatalogEntry> handler = SelectionChanged;
+            Action<CatalogEntry, bool> handler = SelectionChanged;
             if (handler != null)
-                handler(entry);
+                handler(entry, explicitSelection);
         }
 
         #endregion

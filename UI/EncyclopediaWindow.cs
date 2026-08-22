@@ -13,6 +13,8 @@ namespace SEpedia.UI
         private readonly bool survivalMode;
         private readonly CelestialIndex celestial;
         private readonly TextField searchField;
+        private readonly LabelBoxButton previousButton;
+        private readonly LabelBoxButton nextButton;
         private readonly LabelBoxButton closeButton;
         private readonly DefinitionList definitionList;
         private readonly AdvancedFilterDrawer filterDrawer;
@@ -44,13 +46,16 @@ namespace SEpedia.UI
                 Width = 310f,
                 Height = 25f,
                 ParentAlignment = ParentAlignments.InnerRight,
-                Offset = new Vector2(-31f, 0f),
+                Offset = new Vector2(-85f, 0f),
                 AutoResize = false,
                 Format = GlyphFormat.White.WithSize(.82f),
                 UpdateValueCallback = SearchChanged
             };
             // Keep the draggable header from taking focus back after the text field handles the click.
             ((MouseInputElement)searchField.MouseInput).ShareCursor = false;
+
+            previousButton = CreateNavigationButton("<", "Previous page", -58f);
+            nextButton = CreateNavigationButton(">", "Next page", -31f);
 
             closeButton = new LabelBoxButton(header)
             {
@@ -81,6 +86,8 @@ namespace SEpedia.UI
             definitionView = new DefinitionView(index);
             vanillaHud = new VanillaHudVisibilityController();
             closeButton.MouseInput.LeftClicked += delegate { Hide(); };
+            previousButton.MouseInput.LeftClicked += delegate { navigation.GoPrevious(); };
+            nextButton.MouseInput.LeftClicked += delegate { navigation.GoNext(); };
 
             var content = new HudChain(false)
             {
@@ -98,6 +105,7 @@ namespace SEpedia.UI
             };
 
             navigation = new NavigationController(index, definitionList, definitionView);
+            navigation.HistoryChanged += RefreshNavigationButtons;
             definitionList.FilterRequested += ToggleFilters;
             definitionList.ResetFiltersRequested += ResetFilters;
             definitionList.ResultsChanged += RefreshFilterDrawer;
@@ -111,7 +119,9 @@ namespace SEpedia.UI
             Visible = false;
 
             if (definitionList.First != null)
-                definitionView.Show(definitionList.First);
+                navigation.NavigateTo(definitionList.First, false);
+            else
+                RefreshNavigationButtons();
         }
 
         #endregion
@@ -167,6 +177,7 @@ namespace SEpedia.UI
             definitionList.ResultsChanged -= RefreshFilterDrawer;
             definitionList.ResetFiltersRequested -= ResetFilters;
             definitionList.FilterRequested -= ToggleFilters;
+            navigation.HistoryChanged -= RefreshNavigationButtons;
             navigation.Close();
             Unregister();
         }
@@ -188,6 +199,38 @@ namespace SEpedia.UI
         {
             if (Math.Abs(element.Width - width) >= .01f)
                 element.Width = width;
+        }
+
+        private LabelBoxButton CreateNavigationButton(string text, string toolTip, float offset)
+        {
+            var button = new LabelBoxButton(header)
+            {
+                Text = new RichText(text, GlyphFormat.White.WithAlignment(TextAlignment.Center).WithSize(.9f)),
+                Width = 25f,
+                Height = 25f,
+                ParentAlignment = ParentAlignments.InnerRight,
+                Offset = new Vector2(offset, 0f),
+                AutoResize = false,
+                VertCenterText = true,
+                TextPadding = Vector2.Zero,
+                Color = UiTheme.Disabled,
+                HighlightColor = UiTheme.PanelHighlight
+            };
+            button.MouseInput.ToolTip = toolTip;
+            button.InputEnabled = false;
+            return button;
+        }
+
+        private void RefreshNavigationButtons()
+        {
+            SetNavigationButtonState(previousButton, navigation.CanGoPrevious);
+            SetNavigationButtonState(nextButton, navigation.CanGoNext);
+        }
+
+        private static void SetNavigationButtonState(LabelBoxButton button, bool enabled)
+        {
+            button.InputEnabled = enabled;
+            button.Color = enabled ? UiTheme.Panel : UiTheme.Disabled;
         }
 
         #endregion
