@@ -125,7 +125,7 @@ namespace RichHudFramework
 
 			/// <summary>
 			/// Registers a tooltip that will be displayed when the cursor is over the calling element.
-			/// Tooltips are cleared every frame — this must be called every tick inside <c>HandleInput()</c>
+			/// Tooltips are cleared every frame – this must be called every tick inside <c>HandleInput()</c>
 			/// if you want a persistent tooltip.
 			/// The first registered tooltip (in registration order) wins if multiple elements try to show one.
 			/// </summary>

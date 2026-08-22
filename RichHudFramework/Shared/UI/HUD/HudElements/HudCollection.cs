@@ -52,7 +52,7 @@ namespace RichHudFramework
 			public int Count => hudCollectionList.Count;
 
 			/// <summary>
-			/// Always false — this collection is mutable.
+			/// Always false – this collection is mutable.
 			/// </summary>
 			public bool IsReadOnly { get; }
 
@@ -175,7 +175,7 @@ namespace RichHudFramework
 
 			/// <summary>
 			/// Removes a contiguous range of containers starting at <paramref name="index"/>.
-			/// Only affects collection members — regular (non-collection) children are untouched.
+			/// Only affects collection members – regular (non-collection) children are untouched.
 			/// </summary>
 			public virtual void RemoveRange(int index, int count)
 			{

@@ -155,7 +155,7 @@ namespace SEpedia.UI
             for (int index = 0; index < planet.Ores.Count; index++)
             {
                 PlanetOreData ore = planet.Ores[index];
-                ores.Add(new DetailItem(ore.Material + " — start " + ore.Start.ToString("0.###")
+                ores.Add(new DetailItem(ore.Material + " – start " + ore.Start.ToString("0.###")
                     + ", depth " + ore.Depth.ToString("0.###")));
             }
             AddPaged(rows, "Ore mappings", ores, false, false);
@@ -209,7 +209,7 @@ namespace SEpedia.UI
                 RecipeDocument recipe = recipes[index];
                 MyFixedPoint amount = GetAmount(consumed ? recipe.Prerequisites : recipe.Results, itemId);
                 items.Add(new DetailItem(
-                    GetDefinitionName(recipe.DefinitionId) + " — " + FormatAmount(amount, itemId).TrimEnd(),
+                    GetDefinitionName(recipe.DefinitionId) + " – " + FormatAmount(amount, itemId).TrimEnd(),
                     recipe.DefinitionId,
                     BuildRecipeToolTip(recipe)));
             }
@@ -276,7 +276,7 @@ namespace SEpedia.UI
                     items.Add(new DetailItem(ids[index] + " (definition unavailable)"));
                     continue;
                 }
-                string grid = block.CubeBlock != null ? " — " + block.CubeBlock.CubeSize + " grid" : string.Empty;
+                string grid = block.CubeBlock != null ? " – " + block.CubeBlock.CubeSize + " grid" : string.Empty;
                 items.Add(new DetailItem(block.UiDisplayName + grid, block.Id));
             }
             return items;
