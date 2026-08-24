@@ -30,11 +30,11 @@ namespace SEpedia.UI
             }
         }
 
-        private const int MaximumRows = 3;
+        private const float RowSpacing = 2f;
         private readonly CatalogFilter filter;
         private readonly Action categoryChanged;
         private readonly List<CategoryButton> buttons;
-        private readonly HudChain[] rows;
+        private readonly List<HudChain> rows;
         private int activeRows;
         private float availableWidth;
 
@@ -49,24 +49,14 @@ namespace SEpedia.UI
             this.filter = filter;
             this.categoryChanged = categoryChanged;
             buttons = new List<CategoryButton>();
-            rows = new HudChain[MaximumRows];
+            rows = new List<HudChain>();
             availableWidth = 1f;
 
             Root = new HudChain(true)
             {
                 SizingMode = HudChainSizingModes.FitChainAlignAxis | HudChainSizingModes.FitMembersOffAxis,
-                Spacing = 2f
+                Spacing = RowSpacing
             };
-            for (int index = 0; index < rows.Length; index++)
-            {
-                rows[index] = new HudChain(false)
-                {
-                    Height = 29f,
-                    SizingMode = HudChainSizingModes.FitMembersOffAxis,
-                    Spacing = 2f
-                };
-                Root.Add(rows[index]);
-            }
 
             Add(BrowseCategory.Components);
             Add(BrowseCategory.Ores);
@@ -89,9 +79,10 @@ namespace SEpedia.UI
         public void UpdateLayout(float availableWidth)
         {
             this.availableWidth = Math.Max(1f, availableWidth);
-            int rowCount = GetRowCount(this.availableWidth);
+            List<CategoryButton> availableButtons = GetAvailableButtons();
+            int rowCount = GetRowCount(availableButtons, this.availableWidth);
             if (rowCount != activeRows)
-                Reflow(rowCount);
+                Reflow(availableButtons, rowCount);
         }
 
         public void UpdateAvailability(Func<BrowseCategory, bool> isAvailable)
@@ -113,26 +104,44 @@ namespace SEpedia.UI
             if (!selectedAvailable && firstAvailable != null)
                 filter.Category = firstAvailable.Category;
 
-            Reflow(GetRowCount(availableWidth));
+            List<CategoryButton> availableButtons = GetAvailableButtons();
+            Reflow(availableButtons, GetRowCount(availableButtons, availableWidth));
             UpdateSelection();
         }
 
-        private int GetRowCount(float width)
+        private List<CategoryButton> GetAvailableButtons()
         {
-            float requiredWidth = 0f;
-            int availableCount = 0;
+            var availableButtons = new List<CategoryButton>();
             for (int index = 0; index < buttons.Count; index++)
             {
-                if (!buttons[index].Available)
-                    continue;
-                requiredWidth += buttons[index].MinimumWidth;
-                availableCount++;
+                if (buttons[index].Available)
+                    availableButtons.Add(buttons[index]);
             }
-            requiredWidth += Math.Max(0, availableCount - 1) * 2f;
+            return availableButtons;
+        }
 
-            int maximumRows = Math.Max(1, Math.Min(MaximumRows, availableCount));
-            return Math.Max(1, Math.Min(maximumRows,
-                (int)Math.Ceiling(requiredWidth / Math.Max(1f, width))));
+        private static int GetRowCount(IReadOnlyList<CategoryButton> availableButtons, float width)
+        {
+            if (availableButtons.Count == 0)
+                return 1;
+
+            int rowCount = 1;
+            float rowWidth = 0f;
+            for (int index = 0; index < availableButtons.Count; index++)
+            {
+                float buttonWidth = availableButtons[index].MinimumWidth;
+                float candidateWidth = rowWidth > 0f
+                    ? rowWidth + RowSpacing + buttonWidth
+                    : buttonWidth;
+                if (rowWidth > 0f && candidateWidth > width)
+                {
+                    rowCount++;
+                    rowWidth = buttonWidth;
+                }
+                else
+                    rowWidth = candidateWidth;
+            }
+            return rowCount;
         }
 
         #endregion
@@ -184,43 +193,106 @@ namespace SEpedia.UI
 
         private void Reflow(int rowCount)
         {
-            for (int row = 0; row < rows.Length; row++)
+            List<CategoryButton> availableButtons = GetAvailableButtons();
+            Reflow(availableButtons, rowCount);
+        }
+
+        private void Reflow(IReadOnlyList<CategoryButton> availableButtons, int rowCount)
+        {
+            EnsureRows(rowCount);
+            for (int row = 0; row < rows.Count; row++)
                 rows[row].Clear();
 
-            float total = 0f;
-            int availableCount = 0;
-            for (int index = 0; index < buttons.Count; index++)
+            int[] rowEnds = GetBalancedRowEnds(availableButtons, rowCount);
+            int start = 0;
+            for (int row = 0; row < rowCount; row++)
             {
-                if (!buttons[index].Available)
-                    continue;
-                total += buttons[index].MinimumWidth;
-                availableCount++;
-            }
-            float target = total / rowCount;
-            int currentRow = 0;
-            float currentWidth = 0f;
-
-            for (int index = 0; index < buttons.Count; index++)
-            {
-                CategoryButton button = buttons[index];
-                if (!button.Available)
-                    continue;
-                int buttonsRemaining = availableCount;
-                int rowsRemaining = rowCount - currentRow;
-                if (currentRow < rowCount - 1 && currentWidth > 0f &&
-                    currentWidth + button.MinimumWidth > target && buttonsRemaining >= rowsRemaining)
+                int end = rowEnds[row];
+                for (int index = start; index < end; index++)
                 {
-                    currentRow++;
-                    currentWidth = 0f;
+                    CategoryButton button = availableButtons[index];
+                    rows[row].Add(button.Button, button.MinimumWidth);
                 }
-                rows[currentRow].Add(button.Button, button.MinimumWidth);
-                currentWidth += button.MinimumWidth;
-                availableCount--;
+                start = end;
             }
 
             activeRows = rowCount;
-            for (int row = 0; row < rows.Length; row++)
+            for (int row = 0; row < rows.Count; row++)
                 rows[row].Visible = row < rowCount;
+        }
+
+        private void EnsureRows(int rowCount)
+        {
+            while (rows.Count < rowCount)
+            {
+                var row = new HudChain(false)
+                {
+                    Height = 29f,
+                    SizingMode = HudChainSizingModes.FitMembersOffAxis,
+                    Spacing = RowSpacing
+                };
+                rows.Add(row);
+                Root.Add(row);
+            }
+        }
+
+        private static int[] GetBalancedRowEnds(
+            IReadOnlyList<CategoryButton> availableButtons,
+            int rowCount)
+        {
+            int buttonCount = availableButtons.Count;
+            var rowEnds = new int[rowCount];
+            if (buttonCount == 0)
+                return rowEnds;
+
+            var prefixWidths = new float[buttonCount + 1];
+            for (int index = 0; index < buttonCount; index++)
+                prefixWidths[index + 1] = prefixWidths[index] + availableButtons[index].MinimumWidth;
+
+            var costs = new float[rowCount + 1, buttonCount + 1];
+            var balanceCosts = new float[rowCount + 1, buttonCount + 1];
+            var splits = new int[rowCount + 1, buttonCount + 1];
+            for (int row = 0; row <= rowCount; row++)
+            {
+                for (int end = 0; end <= buttonCount; end++)
+                {
+                    costs[row, end] = float.PositiveInfinity;
+                    balanceCosts[row, end] = float.PositiveInfinity;
+                }
+            }
+            costs[0, 0] = 0f;
+            balanceCosts[0, 0] = 0f;
+
+            for (int row = 1; row <= rowCount; row++)
+            {
+                for (int end = row; end <= buttonCount; end++)
+                {
+                    for (int split = row - 1; split < end; split++)
+                    {
+                        int buttonsInRow = end - split;
+                        float currentWidth = prefixWidths[end] - prefixWidths[split] +
+                            Math.Max(0, buttonsInRow - 1) * RowSpacing;
+                        float candidate = Math.Max(costs[row - 1, split], currentWidth);
+                        float balanceCandidate = balanceCosts[row - 1, split] + currentWidth * currentWidth;
+                        if (candidate < costs[row, end] ||
+                            (Math.Abs(candidate - costs[row, end]) < .01f &&
+                                balanceCandidate < balanceCosts[row, end]))
+                        {
+                            costs[row, end] = candidate;
+                            balanceCosts[row, end] = balanceCandidate;
+                            splits[row, end] = split;
+                        }
+                    }
+                }
+            }
+
+            int rowEnd = buttonCount;
+            for (int row = rowCount; row > 0; row--)
+            {
+                rowEnds[row - 1] = rowEnd;
+                rowEnd = splits[row, rowEnd];
+            }
+            return rowEnds;
         }
 
         #endregion

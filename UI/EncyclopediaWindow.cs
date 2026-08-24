@@ -12,9 +12,12 @@ namespace SEpedia.UI
 
         private readonly bool survivalMode;
         private readonly CelestialIndex celestial;
+        private readonly LabelBoxButton settingsButton;
         private readonly TextField searchField;
         private readonly LabelBoxButton previousButton;
+        private readonly RotatedTexture previousIcon;
         private readonly LabelBoxButton nextButton;
+        private readonly RotatedTexture nextIcon;
         private readonly LabelBoxButton closeButton;
         private readonly DefinitionList definitionList;
         private readonly AdvancedFilterDrawer filterDrawer;
@@ -38,7 +41,36 @@ namespace SEpedia.UI
             this.celestial = celestial;
 
             HeaderText = new RichText("SEpedia", GlyphFormat.White.WithAlignment(TextAlignment.Left).WithSize(1.08f));
-            header.TextPadding = new Vector2(14f, 0f);
+            header.TextPadding = new Vector2(66f, 0f);
+
+            settingsButton = new LabelBoxButton(header)
+            {
+                Text = string.Empty,
+                Width = 23f,
+                Height = 23f,
+                ParentAlignment = ParentAlignments.InnerLeft,
+                Offset = new Vector2(4f, 0f),
+                AutoResize = false,
+                VertCenterText = true,
+                TextPadding = Vector2.Zero,
+                Color = UiTheme.Panel,
+                HighlightColor = UiTheme.PanelHighlight
+            };
+            settingsButton.MouseInput.ToolTip = "Settings (coming soon)";
+            settingsButton.MouseInput.LeftClicked += delegate { };
+            new RotatedTexture(
+                new Material(
+                    "SEpediaBuilderCog",
+                    new Vector2(256f),
+                    new Vector2(80f, 72f),
+                    new Vector2(96f)),
+                false,
+                settingsButton)
+            {
+                Width = 15f,
+                Height = 15f,
+                ZOffset = 1
+            };
 
             searchField = new TextField(header)
             {
@@ -46,7 +78,7 @@ namespace SEpedia.UI
                 Width = 310f,
                 Height = 25f,
                 ParentAlignment = ParentAlignments.InnerRight,
-                Offset = new Vector2(-85f, 0f),
+                Offset = new Vector2(-81f, 0f),
                 AutoResize = false,
                 Format = GlyphFormat.White.WithSize(.82f),
                 UpdateValueCallback = SearchChanged
@@ -54,8 +86,10 @@ namespace SEpedia.UI
             // Keep the draggable header from taking focus back after the text field handles the click.
             ((MouseInputElement)searchField.MouseInput).ShareCursor = false;
 
-            previousButton = CreateNavigationButton("<", "Previous page", -58f);
-            nextButton = CreateNavigationButton(">", "Next page", -31f);
+            previousButton = CreateNavigationButton("Previous page", -56f);
+            previousIcon = CreateNavigationIcon(previousButton, true);
+            nextButton = CreateNavigationButton("Next page", -31f);
+            nextIcon = CreateNavigationIcon(nextButton, false);
 
             closeButton = new LabelBoxButton(header)
             {
@@ -201,13 +235,13 @@ namespace SEpedia.UI
                 element.Width = width;
         }
 
-        private LabelBoxButton CreateNavigationButton(string text, string toolTip, float offset)
+        private LabelBoxButton CreateNavigationButton(string toolTip, float offset)
         {
             var button = new LabelBoxButton(header)
             {
-                Text = new RichText(text, GlyphFormat.White.WithAlignment(TextAlignment.Center).WithSize(.9f)),
-                Width = 25f,
-                Height = 25f,
+                Text = string.Empty,
+                Width = 23f,
+                Height = 23f,
                 ParentAlignment = ParentAlignments.InnerRight,
                 Offset = new Vector2(offset, 0f),
                 AutoResize = false,
@@ -221,16 +255,30 @@ namespace SEpedia.UI
             return button;
         }
 
-        private void RefreshNavigationButtons()
+        private static RotatedTexture CreateNavigationIcon(LabelBoxButton button, bool reverse)
         {
-            SetNavigationButtonState(previousButton, navigation.CanGoPrevious);
-            SetNavigationButtonState(nextButton, navigation.CanGoNext);
+            return new RotatedTexture("SEpediaBoreSight", reverse, button)
+            {
+                Width = 15f,
+                Height = 15f,
+                ZOffset = 1
+            };
         }
 
-        private static void SetNavigationButtonState(LabelBoxButton button, bool enabled)
+        private void RefreshNavigationButtons()
+        {
+            SetNavigationButtonState(previousButton, previousIcon, navigation.CanGoPrevious);
+            SetNavigationButtonState(nextButton, nextIcon, navigation.CanGoNext);
+        }
+
+        private static void SetNavigationButtonState(
+            LabelBoxButton button,
+            RotatedTexture icon,
+            bool enabled)
         {
             button.InputEnabled = enabled;
             button.Color = enabled ? UiTheme.Panel : UiTheme.Disabled;
+            icon.Color = enabled ? Color.White : new Color(105, 120, 128);
         }
 
         #endregion
