@@ -7,13 +7,19 @@ namespace SEpedia.Core
 {
     internal sealed class PlanetOreResolver
     {
-        private readonly Dictionary<string, MyDefinitionId> oreByVoxelMaterial;
+        private sealed class ResolvedVoxelMaterial
+        {
+            public MyDefinitionId OreId;
+            public PlanetVoxelMaterialData VoxelMaterial;
+        }
+
+        private readonly Dictionary<string, ResolvedVoxelMaterial> oreByVoxelMaterial;
 
         public PlanetOreResolver(
             MyDefinitionManager manager,
             DefinitionBuildDiagnostics diagnostics)
         {
-            oreByVoxelMaterial = new Dictionary<string, MyDefinitionId>(StringComparer.OrdinalIgnoreCase);
+            oreByVoxelMaterial = new Dictionary<string, ResolvedVoxelMaterial>(StringComparer.OrdinalIgnoreCase);
             try
             {
                 foreach (MyVoxelMaterialDefinition material in manager.GetVoxelMaterialDefinitions())
@@ -22,9 +28,20 @@ namespace SEpedia.Core
                         string.IsNullOrWhiteSpace(material.MinedOre))
                         continue;
 
-                    oreByVoxelMaterial[material.Id.SubtypeName] = new MyDefinitionId(
-                        typeof(MyObjectBuilder_Ore),
-                        material.MinedOre);
+                    oreByVoxelMaterial[material.Id.SubtypeName] = new ResolvedVoxelMaterial
+                    {
+                        OreId = new MyDefinitionId(typeof(MyObjectBuilder_Ore), material.MinedOre),
+                        VoxelMaterial = new PlanetVoxelMaterialData(
+                            material.Id.SubtypeName,
+                            material.DisplayNameText,
+                            material.MinedOre,
+                            material.MinedOreRatio,
+                            material.CanBeHarvested,
+                            material.IsRare,
+                            material.SpawnsInAsteroids,
+                            material.SpawnsFromMeteorites,
+                            material.AsteroidGeneratorSpawnProbabilityMultiplier)
+                    };
                 }
             }
             catch (Exception exception)
@@ -36,11 +53,20 @@ namespace SEpedia.Core
             }
         }
 
-        public bool TryResolve(string voxelMaterial, out MyDefinitionId oreId)
+        public bool TryResolve(
+            string voxelMaterial,
+            out MyDefinitionId oreId,
+            out PlanetVoxelMaterialData materialData)
         {
             oreId = default(MyDefinitionId);
-            return !string.IsNullOrWhiteSpace(voxelMaterial) &&
-                oreByVoxelMaterial.TryGetValue(voxelMaterial, out oreId);
+            materialData = null;
+            ResolvedVoxelMaterial resolved;
+            if (string.IsNullOrWhiteSpace(voxelMaterial) ||
+                !oreByVoxelMaterial.TryGetValue(voxelMaterial, out resolved))
+                return false;
+            oreId = resolved.OreId;
+            materialData = resolved.VoxelMaterial;
+            return true;
         }
     }
 
@@ -203,7 +229,8 @@ namespace SEpedia.Core
                             if (ore != null)
                             {
                                 MyDefinitionId oreId;
-                                bool resolved = oreResolver.TryResolve(ore.Type, out oreId);
+                                PlanetVoxelMaterialData voxelMaterial;
+                                bool resolved = oreResolver.TryResolve(ore.Type, out oreId, out voxelMaterial);
                                 if (!resolved)
                                 {
                                     diagnostics.Report(
@@ -213,8 +240,13 @@ namespace SEpedia.Core
                                 ores.Add(new PlanetOreData(
                                     ore.Type,
                                     resolved ? (MyDefinitionId?)oreId : null,
+                                    ore.Value,
                                     ore.Start,
-                                    ore.Depth));
+                                    ore.Depth,
+                                    ore.TargetColor,
+                                    ore.ColorInfluence,
+                                    ore.ColorShift.HasValue ? ore.ColorShift.Value.ToString() : string.Empty,
+                                    voxelMaterial));
                             }
                         }
                         catch (Exception exception)

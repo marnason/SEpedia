@@ -4,23 +4,73 @@ using VRageMath;
 
 namespace SEpedia.Core
 {
+    internal sealed class PlanetVoxelMaterialData
+    {
+        public string SubtypeName { get; private set; }
+        public string DisplayName { get; private set; }
+        public string MinedOre { get; private set; }
+        public float MinedOreRatio { get; private set; }
+        public bool CanBeHarvested { get; private set; }
+        public bool IsRare { get; private set; }
+        public bool SpawnsInAsteroids { get; private set; }
+        public bool SpawnsFromMeteorites { get; private set; }
+        public int AsteroidSpawnProbabilityMultiplier { get; private set; }
+
+        public PlanetVoxelMaterialData(
+            string subtypeName,
+            string displayName,
+            string minedOre,
+            float minedOreRatio,
+            bool canBeHarvested,
+            bool isRare,
+            bool spawnsInAsteroids,
+            bool spawnsFromMeteorites,
+            int asteroidSpawnProbabilityMultiplier)
+        {
+            SubtypeName = subtypeName ?? string.Empty;
+            DisplayName = displayName ?? string.Empty;
+            MinedOre = minedOre ?? string.Empty;
+            MinedOreRatio = minedOreRatio;
+            CanBeHarvested = canBeHarvested;
+            IsRare = isRare;
+            SpawnsInAsteroids = spawnsInAsteroids;
+            SpawnsFromMeteorites = spawnsFromMeteorites;
+            AsteroidSpawnProbabilityMultiplier = asteroidSpawnProbabilityMultiplier;
+        }
+    }
+
     internal sealed class PlanetOreData
     {
         public string Material { get; private set; }
         public MyDefinitionId? OreId { get; private set; }
+        public byte Value { get; private set; }
         public float Start { get; private set; }
         public float Depth { get; private set; }
+        public string TargetColor { get; private set; }
+        public float ColorInfluence { get; private set; }
+        public string ColorShift { get; private set; }
+        public PlanetVoxelMaterialData VoxelMaterial { get; private set; }
 
         public PlanetOreData(
             string material,
             MyDefinitionId? oreId,
+            byte value,
             float start,
-            float depth)
+            float depth,
+            string targetColor,
+            float colorInfluence,
+            string colorShift,
+            PlanetVoxelMaterialData voxelMaterial)
         {
             Material = material ?? string.Empty;
             OreId = oreId;
+            Value = value;
             Start = start;
             Depth = depth;
+            TargetColor = targetColor ?? string.Empty;
+            ColorInfluence = colorInfluence;
+            ColorShift = colorShift ?? string.Empty;
+            VoxelMaterial = voxelMaterial;
         }
     }
 

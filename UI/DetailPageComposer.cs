@@ -386,22 +386,80 @@ namespace SEpedia.UI
 
         private DetailRelationshipCandidate CreatePlanetOreItem(PlanetOreData mapping)
         {
-            string details = FormatPlanetOreMapping(mapping);
+            string displayName = GetPlanetOreDisplayName(mapping);
+            string label = displayName + " - " + FormatPlanetOreDepth(mapping);
+            string toolTip = BuildPlanetOreToolTip(mapping, displayName);
             if (!mapping.OreId.HasValue)
-                return new DetailRelationshipCandidate(details + " (ore unavailable)");
+                return new DetailRelationshipCandidate(label + " (ore unavailable)", null, toolTip);
 
             DefinitionDocument ore;
             if (!index.TryGet(mapping.OreId.Value, out ore))
-                return new DetailRelationshipCandidate(details + " (ore unavailable)");
+                return new DetailRelationshipCandidate(label + " (ore unavailable)", null, toolTip);
 
             return new DetailRelationshipCandidate(
-                mapping.Material + " → " + ore.UiDisplayName + " – " + FormatPlanetOreDepth(mapping),
-                new CatalogEntry(ore));
+                label,
+                new CatalogEntry(ore),
+                toolTip);
         }
 
-        private static string FormatPlanetOreMapping(PlanetOreData mapping)
+        private string FormatPlanetOreMapping(PlanetOreData mapping)
         {
-            return mapping.Material + " – " + FormatPlanetOreDepth(mapping);
+            return GetPlanetOreDisplayName(mapping) + " - " + FormatPlanetOreDepth(mapping);
+        }
+
+        private string GetPlanetOreDisplayName(PlanetOreData mapping)
+        {
+            DefinitionDocument ore;
+            if (mapping.OreId.HasValue && index.TryGet(mapping.OreId.Value, out ore))
+                return ore.UiDisplayName;
+            if (mapping.VoxelMaterial != null &&
+                !string.IsNullOrWhiteSpace(mapping.VoxelMaterial.DisplayName))
+                return mapping.VoxelMaterial.DisplayName;
+            return "Unavailable ore";
+        }
+
+        private string BuildPlanetOreToolTip(PlanetOreData mapping, string displayName)
+        {
+            var builder = new StringBuilder();
+            AppendToolTipField(builder, "Ore", displayName);
+            if (mapping.OreId.HasValue)
+                AppendToolTipField(builder, "Ore definition", mapping.OreId.Value.ToString());
+            AppendToolTipField(
+                builder,
+                "Voxel material",
+                mapping.VoxelMaterial != null ? mapping.VoxelMaterial.SubtypeName : mapping.Material);
+            AppendToolTipField(builder, "Mapping value", mapping.Value.ToString());
+            AppendToolTipField(builder, "Start", mapping.Start.ToString("0.###"));
+            AppendToolTipField(builder, "Depth", mapping.Depth.ToString("0.###"));
+            AppendToolTipField(builder, "Target color", mapping.TargetColor);
+            AppendToolTipField(builder, "Color influence", mapping.ColorInfluence.ToString("0.###"));
+            AppendToolTipField(builder, "Color shift", mapping.ColorShift);
+
+            PlanetVoxelMaterialData voxel = mapping.VoxelMaterial;
+            if (voxel != null)
+            {
+                AppendToolTipField(builder, "Voxel display name", voxel.DisplayName);
+                AppendToolTipField(builder, "Mined ore subtype", voxel.MinedOre);
+                AppendToolTipField(builder, "Mined ore ratio", voxel.MinedOreRatio.ToString("0.###"));
+                AppendToolTipField(builder, "Harvestable", YesNo(voxel.CanBeHarvested));
+                AppendToolTipField(builder, "Rare", YesNo(voxel.IsRare));
+                AppendToolTipField(builder, "Spawns in asteroids", YesNo(voxel.SpawnsInAsteroids));
+                AppendToolTipField(builder, "Spawns from meteorites", YesNo(voxel.SpawnsFromMeteorites));
+                AppendToolTipField(
+                    builder,
+                    "Asteroid spawn probability multiplier",
+                    voxel.AsteroidSpawnProbabilityMultiplier.ToString());
+            }
+            return builder.ToString();
+        }
+
+        private static void AppendToolTipField(StringBuilder builder, string label, string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                return;
+            if (builder.Length > 0)
+                builder.Append('\n');
+            builder.Append(label).Append(": ").Append(value);
         }
 
         private static string FormatPlanetOreDepth(PlanetOreData mapping)
