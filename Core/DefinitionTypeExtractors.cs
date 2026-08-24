@@ -5,6 +5,45 @@ using VRage.Game;
 
 namespace SEpedia.Core
 {
+    internal sealed class PlanetOreResolver
+    {
+        private readonly Dictionary<string, MyDefinitionId> oreByVoxelMaterial;
+
+        public PlanetOreResolver(
+            MyDefinitionManager manager,
+            DefinitionBuildDiagnostics diagnostics)
+        {
+            oreByVoxelMaterial = new Dictionary<string, MyDefinitionId>(StringComparer.OrdinalIgnoreCase);
+            try
+            {
+                foreach (MyVoxelMaterialDefinition material in manager.GetVoxelMaterialDefinitions())
+                {
+                    if (material == null || string.IsNullOrWhiteSpace(material.Id.SubtypeName) ||
+                        string.IsNullOrWhiteSpace(material.MinedOre))
+                        continue;
+
+                    oreByVoxelMaterial[material.Id.SubtypeName] = new MyDefinitionId(
+                        typeof(MyObjectBuilder_Ore),
+                        material.MinedOre);
+                }
+            }
+            catch (Exception exception)
+            {
+                diagnostics.Report(
+                    "voxel-material-registry",
+                    "Could not enumerate voxel materials for planet ore mappings",
+                    exception);
+            }
+        }
+
+        public bool TryResolve(string voxelMaterial, out MyDefinitionId oreId)
+        {
+            oreId = default(MyDefinitionId);
+            return !string.IsNullOrWhiteSpace(voxelMaterial) &&
+                oreByVoxelMaterial.TryGetValue(voxelMaterial, out oreId);
+        }
+    }
+
     internal static class PhysicalDefinitionExtractor
     {
         public static PhysicalItemData Extract(
@@ -124,6 +163,7 @@ namespace SEpedia.Core
     {
         public static PlanetGeneratorData ExtractPlanet(
             MyPlanetGeneratorDefinition definition,
+            PlanetOreResolver oreResolver,
             DefinitionBuildDiagnostics diagnostics)
         {
             try
@@ -161,7 +201,21 @@ namespace SEpedia.Core
                         {
                             MyPlanetOreMapping ore = definition.OreMappings[index];
                             if (ore != null)
-                                ores.Add(new PlanetOreData(ore.Type, ore.Start, ore.Depth));
+                            {
+                                MyDefinitionId oreId;
+                                bool resolved = oreResolver.TryResolve(ore.Type, out oreId);
+                                if (!resolved)
+                                {
+                                    diagnostics.Report(
+                                        "planet-ore-material",
+                                        "Could not resolve voxel material " + ore.Type + " in " + definition.Id + ".");
+                                }
+                                ores.Add(new PlanetOreData(
+                                    ore.Type,
+                                    resolved ? (MyDefinitionId?)oreId : null,
+                                    ore.Start,
+                                    ore.Depth));
+                            }
                         }
                         catch (Exception exception)
                         {

@@ -163,11 +163,7 @@ namespace SEpedia.UI
 
             var ores = new List<DetailItem>();
             for (int index = 0; index < planet.Ores.Count; index++)
-            {
-                PlanetOreData ore = planet.Ores[index];
-                ores.Add(new DetailItem(ore.Material + " – start " + ore.Start.ToString("0.###")
-                    + ", depth " + ore.Depth.ToString("0.###")));
-            }
+                ores.Add(CreatePlanetOreItem(planet.Ores[index]));
             AddPaged(rows, "Ore mappings", ores, false, false);
         }
 
@@ -213,6 +209,33 @@ namespace SEpedia.UI
 
         private void AddReverseRelationships(IList<DetailRowModel> rows, MyDefinitionId definitionId)
         {
+            IReadOnlyList<PlanetOreUsage> planetUsages = index.GetPlanetGeneratorsUsingOre(definitionId);
+            var planetItems = new List<DetailItem>();
+            int planetUsageIndex = 0;
+            while (planetUsageIndex < planetUsages.Count)
+            {
+                int firstUsageIndex = planetUsageIndex;
+                MyDefinitionId generatorId = planetUsages[firstUsageIndex].GeneratorId;
+                while (planetUsageIndex < planetUsages.Count &&
+                    planetUsages[planetUsageIndex].GeneratorId == generatorId)
+                    planetUsageIndex++;
+
+                DefinitionDocument generator;
+                if (!index.TryGet(generatorId, out generator))
+                    continue;
+
+                int mappingCount = planetUsageIndex - firstUsageIndex;
+                string text = generator.UiDisplayName + " – " +
+                    (mappingCount == 1
+                        ? FormatPlanetOreMapping(planetUsages[firstUsageIndex].Mapping)
+                        : mappingCount + " mappings");
+                var toolTip = new StringBuilder("Ore mappings in " + generator.UiDisplayName);
+                for (int mappingIndex = firstUsageIndex; mappingIndex < planetUsageIndex; mappingIndex++)
+                    toolTip.Append('\n').Append(FormatPlanetOreMapping(planetUsages[mappingIndex].Mapping));
+                planetItems.Add(new DetailItem(text, new CatalogEntry(generator), toolTip.ToString()));
+            }
+            AddPaged(rows, "Planet generators", planetItems, true, false);
+
             IReadOnlyList<RecipeDocument> producing = index.Recipes.GetMenuProducingRecipes(definitionId);
             if (producing.Count > 0)
                 AddPaged(rows, "Produced by recipes", CreateRecipeItems(producing, definitionId, false), true, false);
@@ -326,6 +349,32 @@ namespace SEpedia.UI
             return index.TryGet(definitionId, out target)
                 ? new CatalogEntry(target)
                 : null;
+        }
+
+        private DetailItem CreatePlanetOreItem(PlanetOreData mapping)
+        {
+            string details = FormatPlanetOreMapping(mapping);
+            if (!mapping.OreId.HasValue)
+                return new DetailItem(details + " (ore unavailable)");
+
+            DefinitionDocument ore;
+            if (!index.TryGet(mapping.OreId.Value, out ore))
+                return new DetailItem(details + " (ore unavailable)");
+
+            return new DetailItem(
+                mapping.Material + " → " + ore.UiDisplayName + " – " + FormatPlanetOreDepth(mapping),
+                new CatalogEntry(ore));
+        }
+
+        private static string FormatPlanetOreMapping(PlanetOreData mapping)
+        {
+            return mapping.Material + " – " + FormatPlanetOreDepth(mapping);
+        }
+
+        private static string FormatPlanetOreDepth(PlanetOreData mapping)
+        {
+            return "start " + mapping.Start.ToString("0.###") +
+                ", depth " + mapping.Depth.ToString("0.###");
         }
 
         private string GetDefinitionName(MyDefinitionId definitionId)

@@ -7,14 +7,32 @@ namespace SEpedia.Core
     internal sealed class PlanetOreData
     {
         public string Material { get; private set; }
+        public MyDefinitionId? OreId { get; private set; }
         public float Start { get; private set; }
         public float Depth { get; private set; }
 
-        public PlanetOreData(string material, float start, float depth)
+        public PlanetOreData(
+            string material,
+            MyDefinitionId? oreId,
+            float start,
+            float depth)
         {
             Material = material ?? string.Empty;
+            OreId = oreId;
             Start = start;
             Depth = depth;
+        }
+    }
+
+    internal sealed class PlanetOreUsage
+    {
+        public MyDefinitionId GeneratorId { get; private set; }
+        public PlanetOreData Mapping { get; private set; }
+
+        public PlanetOreUsage(MyDefinitionId generatorId, PlanetOreData mapping)
+        {
+            GeneratorId = generatorId;
+            Mapping = mapping;
         }
     }
 

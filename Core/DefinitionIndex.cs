@@ -9,9 +9,12 @@ namespace SEpedia.Core
 
         private static readonly IReadOnlyList<BlockUsage> EmptyBlockUsages =
             new List<BlockUsage>().AsReadOnly();
+        private static readonly IReadOnlyList<PlanetOreUsage> EmptyPlanetOreUsages =
+            new List<PlanetOreUsage>().AsReadOnly();
 
         private readonly Dictionary<MyDefinitionId, DefinitionDocument> byId;
         private readonly Dictionary<MyDefinitionId, IReadOnlyList<BlockUsage>> blocksUsingItem;
+        private readonly Dictionary<MyDefinitionId, IReadOnlyList<PlanetOreUsage>> planetGeneratorsUsingOre;
 
         public IReadOnlyList<DefinitionDocument> All { get; private set; }
         public RecipeIndex Recipes { get; private set; }
@@ -38,6 +41,7 @@ namespace SEpedia.Core
             byId = new Dictionary<MyDefinitionId, DefinitionDocument>();
             var recipes = new List<RecipeDocument>();
             var mutableBlockUsage = new Dictionary<MyDefinitionId, List<BlockUsage>>();
+            var mutablePlanetOreUsage = new Dictionary<MyDefinitionId, List<PlanetOreUsage>>();
 
             for (int index = 0; index < sorted.Count; index++)
             {
@@ -48,6 +52,8 @@ namespace SEpedia.Core
                     recipes.Add(definition.Recipe);
                 if (definition.CubeBlock != null)
                     AddBlockUsage(mutableBlockUsage, definition);
+                if (definition.PlanetGenerator != null)
+                    AddPlanetOreUsage(mutablePlanetOreUsage, definition);
             }
 
             blocksUsingItem = new Dictionary<MyDefinitionId, IReadOnlyList<BlockUsage>>();
@@ -55,6 +61,13 @@ namespace SEpedia.Core
             {
                 pair.Value.Sort(CompareBlockUsages);
                 blocksUsingItem.Add(pair.Key, pair.Value.AsReadOnly());
+            }
+
+            planetGeneratorsUsingOre = new Dictionary<MyDefinitionId, IReadOnlyList<PlanetOreUsage>>();
+            foreach (KeyValuePair<MyDefinitionId, List<PlanetOreUsage>> pair in mutablePlanetOreUsage)
+            {
+                pair.Value.Sort(ComparePlanetOreUsages);
+                planetGeneratorsUsingOre.Add(pair.Key, pair.Value.AsReadOnly());
             }
 
             Recipes = new RecipeIndex(recipes);
@@ -82,6 +95,27 @@ namespace SEpedia.Core
             }
         }
 
+        private static void AddPlanetOreUsage(
+            IDictionary<MyDefinitionId, List<PlanetOreUsage>> target,
+            DefinitionDocument generator)
+        {
+            IReadOnlyList<PlanetOreData> mappings = generator.PlanetGenerator.Ores;
+            for (int index = 0; index < mappings.Count; index++)
+            {
+                PlanetOreData mapping = mappings[index];
+                if (!mapping.OreId.HasValue)
+                    continue;
+
+                List<PlanetOreUsage> usages;
+                if (!target.TryGetValue(mapping.OreId.Value, out usages))
+                {
+                    usages = new List<PlanetOreUsage>();
+                    target.Add(mapping.OreId.Value, usages);
+                }
+                usages.Add(new PlanetOreUsage(generator.Id, mapping));
+            }
+        }
+
         #endregion
 
         #region Queries
@@ -95,6 +129,14 @@ namespace SEpedia.Core
         {
             IReadOnlyList<BlockUsage> usages;
             return blocksUsingItem.TryGetValue(itemId, out usages) ? usages : EmptyBlockUsages;
+        }
+
+        public IReadOnlyList<PlanetOreUsage> GetPlanetGeneratorsUsingOre(MyDefinitionId oreId)
+        {
+            IReadOnlyList<PlanetOreUsage> usages;
+            return planetGeneratorsUsingOre.TryGetValue(oreId, out usages)
+                ? usages
+                : EmptyPlanetOreUsages;
         }
 
         #endregion
@@ -126,6 +168,29 @@ namespace SEpedia.Core
                     left.Id.ToString(),
                     right.Id.ToString(),
                     System.StringComparison.OrdinalIgnoreCase);
+        }
+
+        private int ComparePlanetOreUsages(PlanetOreUsage left, PlanetOreUsage right)
+        {
+            DefinitionDocument leftGenerator;
+            DefinitionDocument rightGenerator;
+            string leftName = byId.TryGetValue(left.GeneratorId, out leftGenerator)
+                ? leftGenerator.UiDisplayName
+                : left.GeneratorId.ToString();
+            string rightName = byId.TryGetValue(right.GeneratorId, out rightGenerator)
+                ? rightGenerator.UiDisplayName
+                : right.GeneratorId.ToString();
+            int generator = string.Compare(leftName, rightName, System.StringComparison.OrdinalIgnoreCase);
+            if (generator != 0)
+                return generator;
+
+            int material = string.Compare(
+                left.Mapping.Material,
+                right.Mapping.Material,
+                System.StringComparison.OrdinalIgnoreCase);
+            return material != 0
+                ? material
+                : left.Mapping.Start.CompareTo(right.Mapping.Start);
         }
 
         #endregion

@@ -10,13 +10,16 @@ namespace SEpedia.Core
 
         private readonly DefinitionRelationships relationships;
         private readonly DefinitionBuildDiagnostics diagnostics;
+        private readonly PlanetOreResolver planetOreResolver;
 
         public DefinitionExtractors(
+            MyDefinitionManager manager,
             DefinitionRelationships relationships,
             DefinitionBuildDiagnostics diagnostics)
         {
             this.relationships = relationships;
             this.diagnostics = diagnostics;
+            planetOreResolver = new PlanetOreResolver(manager, diagnostics);
         }
 
         #endregion
@@ -65,7 +68,10 @@ namespace SEpedia.Core
             if (planetDefinition != null)
             {
                 browseCategory = BrowseCategory.Celestial;
-                planet = CelestialDefinitionExtractor.ExtractPlanet(planetDefinition, diagnostics);
+                planet = CelestialDefinitionExtractor.ExtractPlanet(
+                    planetDefinition,
+                    planetOreResolver,
+                    diagnostics);
             }
 
             MyAsteroidGeneratorDefinition asteroidDefinition = definition as MyAsteroidGeneratorDefinition;

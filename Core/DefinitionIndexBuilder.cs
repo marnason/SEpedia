@@ -30,7 +30,7 @@ namespace SEpedia.Core
                 sourceDefinitions,
                 survivalMode,
                 diagnostics);
-            var extractors = new DefinitionExtractors(relationships, diagnostics);
+            var extractors = new DefinitionExtractors(manager, relationships, diagnostics);
             var documents = new List<DefinitionDocument>();
             var ids = new HashSet<MyDefinitionId>();
 
