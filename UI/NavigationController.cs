@@ -49,12 +49,17 @@ namespace SEpedia.UI
         {
             DefinitionDocument definition;
             if (index.TryGet(id, out definition))
-                NavigateTo(new CatalogEntry(definition, 0), true, true);
+                NavigateTo(new CatalogEntry(definition), true, true);
         }
 
         public void NavigateTo(CatalogEntry entry, bool synchronizeList)
         {
             NavigateTo(entry, synchronizeList, true);
+        }
+
+        public void NavigateTo(CatalogEntry entry)
+        {
+            NavigateTo(entry, true, true);
         }
 
         private void NavigateTo(CatalogEntry entry, bool synchronizeList, bool recordDuplicate)
@@ -82,6 +87,12 @@ namespace SEpedia.UI
         public void GoNext()
         {
             MoveHistory(1);
+        }
+
+        public void RefreshCurrent()
+        {
+            if (!navigating && historyIndex >= 0 && historyIndex < history.Count)
+                Show(history[historyIndex], false);
         }
 
         private void MoveHistory(int delta)

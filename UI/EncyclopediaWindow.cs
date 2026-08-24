@@ -117,7 +117,7 @@ namespace SEpedia.UI
                 Visible = false
             };
 
-            definitionView = new DefinitionView(index);
+            definitionView = new DefinitionView(index, celestial);
             vanillaHud = new VanillaHudVisibilityController();
             closeButton.MouseInput.LeftClicked += delegate { Hide(); };
             previousButton.MouseInput.LeftClicked += delegate { navigation.GoPrevious(); };
@@ -196,6 +196,7 @@ namespace SEpedia.UI
         public void RefreshCelestial()
         {
             definitionList.RebuildCatalog(celestial != null ? celestial.Planets : null);
+            navigation.RefreshCurrent();
         }
 
         public void Close()

@@ -140,7 +140,6 @@ namespace SEpedia.Core
         public bool IsEnabled { get; private set; }
         public bool IsPublic { get; private set; }
         public bool IsAvailableInSurvival { get; private set; }
-        public PlanetGeneratorData GeneratorData { get; private set; }
         public bool HasGeneratorMetadata { get; private set; }
 
         public PlanetSnapshot(
@@ -158,7 +157,6 @@ namespace SEpedia.Core
             bool isEnabled,
             bool isPublic,
             bool isAvailableInSurvival,
-            PlanetGeneratorData generatorData,
             bool hasGeneratorMetadata)
         {
             EntityId = entityId;
@@ -175,7 +173,6 @@ namespace SEpedia.Core
             IsEnabled = isEnabled;
             IsPublic = isPublic;
             IsAvailableInSurvival = isAvailableInSurvival;
-            GeneratorData = generatorData;
             HasGeneratorMetadata = hasGeneratorMetadata;
         }
     }

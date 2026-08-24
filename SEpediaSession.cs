@@ -154,6 +154,8 @@ namespace SEpedia
 
                 SEpediaLog.Info(
                     "Indexed " + built.All.Count + " of " + built.SourceCount + " definitions, " +
+                    built.PlanetGeneratorCount + " planet generators, " +
+                    built.AsteroidGeneratorCount + " asteroid generators, " +
                     built.Recipes.Count + " recipes (" + built.Recipes.MenuCount + " production-menu reachable), with " +
                     built.IssueCount + " isolated issues in " +
                     stopwatch.ElapsedMilliseconds + " ms.");

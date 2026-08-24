@@ -120,8 +120,10 @@ namespace SEpedia.Core
         {
             try
             {
-                if (!string.IsNullOrWhiteSpace(definition.DisplayNameText))
-                    return definition.DisplayNameText;
+                string displayName = definition.DisplayNameText;
+                if (!string.IsNullOrWhiteSpace(displayName) &&
+                    !IsBareAsteroidGeneratorName(definition, id, displayName))
+                    return displayName;
             }
             catch (Exception exception)
             {
@@ -130,14 +132,30 @@ namespace SEpedia.Core
 
             try
             {
-                if (!string.IsNullOrWhiteSpace(definition.DisplayNameString))
-                    return definition.DisplayNameString;
+                string displayName = definition.DisplayNameString;
+                if (!string.IsNullOrWhiteSpace(displayName) &&
+                    !IsBareAsteroidGeneratorName(definition, id, displayName))
+                    return displayName;
             }
             catch (Exception exception)
             {
                 diagnostics.Report("display-name-fallback", "Could not read fallback name for " + id, exception);
             }
+
+            if (definition is MyAsteroidGeneratorDefinition && !string.IsNullOrWhiteSpace(id.SubtypeName))
+                return "Asteroid generator " + id.SubtypeName;
+
             return !string.IsNullOrWhiteSpace(id.SubtypeName) ? id.SubtypeName : id.ToString();
+        }
+
+        private static bool IsBareAsteroidGeneratorName(
+            MyDefinitionBase definition,
+            MyDefinitionId id,
+            string displayName)
+        {
+            return definition is MyAsteroidGeneratorDefinition &&
+                (string.Equals(displayName, id.SubtypeName, StringComparison.OrdinalIgnoreCase) ||
+                 string.Equals(displayName, id.ToString(), StringComparison.OrdinalIgnoreCase));
         }
 
         private string GetDescription(MyDefinitionBase definition)

@@ -39,8 +39,7 @@ namespace SEpedia.Core
                 if (definition.BrowseCategory == BrowseCategory.None)
                     continue;
 
-                int celestialOrder = definition.AsteroidGenerator != null ? 1 : 2;
-                Add(new CatalogEntry(definition, celestialOrder), definitions);
+                Add(new CatalogEntry(definition), definitions);
             }
 
             if (planets != null)
@@ -75,6 +74,8 @@ namespace SEpedia.Core
                     Normalize(id),
                     Normalize(category),
                     Normalize(runtimeType),
+                    Normalize(entry.CelestialKindKey),
+                    Normalize(entry.CelestialKindDisplayName),
                     Normalize(entry.Origin.DisplayName),
                     Normalize(entry.Origin.ModId),
                     Normalize(entry.Origin.ServiceName),
@@ -127,11 +128,13 @@ namespace SEpedia.Core
 
             List<FacetCount> sources;
             List<FacetCount> blockTypes;
+            List<FacetCount> celestialKinds;
             List<ScoredEntry> matches = FindMatches(
                 filter,
                 includedDefinition,
                 out sources,
-                out blockTypes);
+                out blockTypes,
+                out celestialKinds);
 
             int first = Math.Min(Math.Max(0, offset), matches.Count);
             int count = Math.Min(Math.Max(0, limit), matches.Count - first);
@@ -139,7 +142,7 @@ namespace SEpedia.Core
             for (int index = 0; index < count; index++)
                 result.Add(matches[first + index].Entry);
 
-            return new CatalogResult(result, matches.Count, sources, blockTypes);
+            return new CatalogResult(result, matches.Count, sources, blockTypes, celestialKinds);
         }
 
         public int FindDefinitionResultIndex(
@@ -153,11 +156,13 @@ namespace SEpedia.Core
 
             List<FacetCount> sources;
             List<FacetCount> blockTypes;
+            List<FacetCount> celestialKinds;
             List<ScoredEntry> matches = FindMatches(
                 filter,
                 includedDefinition,
                 out sources,
-                out blockTypes);
+                out blockTypes,
+                out celestialKinds);
             totalCount = matches.Count;
             for (int index = 0; index < matches.Count; index++)
             {
@@ -172,7 +177,8 @@ namespace SEpedia.Core
             CatalogFilter filter,
             DefinitionDocument includedDefinition,
             out List<FacetCount> sources,
-            out List<FacetCount> blockTypes)
+            out List<FacetCount> blockTypes,
+            out List<FacetCount> celestialKinds)
         {
             string query = Normalize(filter.SearchText).Trim();
             string[] tokens = query.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
@@ -180,7 +186,14 @@ namespace SEpedia.Core
             IReadOnlyList<SearchableEntry> categoryEntries = entriesByCategory.TryGetValue(filter.Category, out categoryList)
                 ? categoryList
                 : EmptyEntries;
-            BuildFacets(categoryEntries, filter, query, tokens, out sources, out blockTypes);
+            BuildFacets(
+                categoryEntries,
+                filter,
+                query,
+                tokens,
+                out sources,
+                out blockTypes,
+                out celestialKinds);
 
             var matches = new List<ScoredEntry>();
             bool forcedDefinitionIncluded = false;
@@ -218,12 +231,15 @@ namespace SEpedia.Core
             string query,
             string[] tokens,
             out List<FacetCount> sources,
-            out List<FacetCount> blockTypes)
+            out List<FacetCount> blockTypes,
+            out List<FacetCount> celestialKinds)
         {
             var sourceCounts = new Dictionary<string, int>(StringComparer.Ordinal);
             var sourceNames = new Dictionary<string, string>(StringComparer.Ordinal);
             var blockTypeCounts = new Dictionary<string, int>(StringComparer.Ordinal);
             var blockTypeNames = new Dictionary<string, string>(StringComparer.Ordinal);
+            var celestialKindCounts = new Dictionary<string, int>(StringComparer.Ordinal);
+            var celestialKindNames = new Dictionary<string, string>(StringComparer.Ordinal);
 
             for (int index = 0; index < categoryEntries.Count; index++)
             {
@@ -235,7 +251,9 @@ namespace SEpedia.Core
                     Score(searchable, query, tokens) < 0)
                     continue;
 
-                if (MatchesBlockFilters(entry, filter) && MatchesBlockType(entry, filter))
+                if (MatchesBlockFilters(entry, filter) &&
+                    MatchesBlockType(entry, filter) &&
+                    MatchesCelestialKind(entry, filter))
                 {
                     string sourceKey = entry.Origin.SourceKey;
                     AddFacet(sourceCounts, sourceNames, sourceKey, entry.Origin.DisplayName);
@@ -251,12 +269,23 @@ namespace SEpedia.Core
                         AddFacet(blockTypeCounts, blockTypeNames, blockTypeKey, CatalogText.GetFriendlyRuntimeType(blockTypeKey));
                     }
                 }
+
+                if (filter.Category == BrowseCategory.Celestial && MatchesSource(entry, filter))
+                {
+                    AddFacet(
+                        celestialKindCounts,
+                        celestialKindNames,
+                        entry.CelestialKindKey,
+                        entry.CelestialKindDisplayName);
+                }
             }
 
             sources = CreateFacets(sourceCounts, sourceNames);
             sources.Sort(CompareSourceFacet);
             blockTypes = CreateFacets(blockTypeCounts, blockTypeNames);
             blockTypes.Sort(CompareFacet);
+            celestialKinds = CreateFacets(celestialKindCounts, celestialKindNames);
+            celestialKinds.Sort(CompareCelestialKindFacet);
         }
 
         private static void AddFacet(
@@ -290,7 +319,8 @@ namespace SEpedia.Core
             return MatchesCommonFilters(entry, filter) &&
                 MatchesSource(entry, filter) &&
                 MatchesBlockFilters(entry, filter) &&
-                MatchesBlockType(entry, filter);
+                MatchesBlockType(entry, filter) &&
+                MatchesCelestialKind(entry, filter);
         }
 
         private static bool MatchesCommonFilters(CatalogEntry entry, CatalogFilter filter)
@@ -326,6 +356,13 @@ namespace SEpedia.Core
             return filter.Category != BrowseCategory.Blocks ||
                 filter.SelectedBlockTypes.Count == 0 ||
                 filter.SelectedBlockTypes.Contains(entry.Definition.RuntimeTypeName);
+        }
+
+        private static bool MatchesCelestialKind(CatalogEntry entry, CatalogFilter filter)
+        {
+            return filter.Category != BrowseCategory.Celestial ||
+                filter.SelectedCelestialKinds.Count == 0 ||
+                filter.SelectedCelestialKinds.Contains(entry.CelestialKindKey);
         }
 
         private static bool MatchesTriState(bool value, TriStateFilter filter)
@@ -370,7 +407,7 @@ namespace SEpedia.Core
         {
             if (left.Entry.Category == BrowseCategory.Celestial && right.Entry.Category == BrowseCategory.Celestial)
             {
-                int kind = left.Entry.CelestialSortOrder.CompareTo(right.Entry.CelestialSortOrder);
+                int kind = CompareCelestialKinds(left.Entry, right.Entry);
                 if (kind != 0)
                     return kind;
             }
@@ -385,7 +422,7 @@ namespace SEpedia.Core
         {
             if (left.Entry.Category == BrowseCategory.Celestial && right.Entry.Category == BrowseCategory.Celestial)
             {
-                int kind = left.Entry.CelestialSortOrder.CompareTo(right.Entry.CelestialSortOrder);
+                int kind = CompareCelestialKinds(left.Entry, right.Entry);
                 if (kind != 0)
                     return kind;
             }
@@ -399,6 +436,32 @@ namespace SEpedia.Core
         private static int CompareFacet(FacetCount left, FacetCount right)
         {
             return string.Compare(left.DisplayName, right.DisplayName, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static int CompareCelestialKinds(CatalogEntry left, CatalogEntry right)
+        {
+            if (left.IsSpawnedPlanet != right.IsSpawnedPlanet)
+                return left.IsSpawnedPlanet ? -1 : 1;
+
+            int displayName = string.Compare(
+                left.CelestialKindDisplayName,
+                right.CelestialKindDisplayName,
+                StringComparison.OrdinalIgnoreCase);
+            return displayName != 0
+                ? displayName
+                : string.Compare(
+                    left.CelestialKindKey,
+                    right.CelestialKindKey,
+                    StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static int CompareCelestialKindFacet(FacetCount left, FacetCount right)
+        {
+            bool leftSpawned = left.Key == "spawned";
+            bool rightSpawned = right.Key == "spawned";
+            if (leftSpawned != rightSpawned)
+                return leftSpawned ? -1 : 1;
+            return CompareFacet(left, right);
         }
 
         private static int CompareSourceFacet(FacetCount left, FacetCount right)

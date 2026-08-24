@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using RichHudFramework.UI;
 using RichHudFramework.UI.Rendering;
 using SEpedia.Core;
-using VRage.Game;
 using VRageMath;
 
 namespace SEpedia.UI
@@ -12,7 +11,7 @@ namespace SEpedia.UI
     {
         #region State and Construction
 
-        public event Action<MyDefinitionId> LinkClicked;
+        public event Action<CatalogEntry> LinkClicked;
 
         private readonly ScrollBox content;
         private readonly List<HudElementBase> rows;
@@ -22,9 +21,12 @@ namespace SEpedia.UI
         private float lastRowWidth;
         private bool layoutDirty;
 
-        public DefinitionView(DefinitionIndex index, HudParentBase parent = null) : base(parent)
+        public DefinitionView(
+            DefinitionIndex index,
+            CelestialIndex celestial,
+            HudParentBase parent = null) : base(parent)
         {
-            composer = new DetailPageComposer(index);
+            composer = new DetailPageComposer(index, celestial);
             rows = new List<HudElementBase>();
             pagedSections = new List<PagedDetailSection>();
             lastRowWidth = -1f;
@@ -200,11 +202,11 @@ namespace SEpedia.UI
 
         #region Event Dispatch
 
-        private void RaiseLinkClicked(MyDefinitionId id)
+        private void RaiseLinkClicked(CatalogEntry entry)
         {
-            Action<MyDefinitionId> handler = LinkClicked;
+            Action<CatalogEntry> handler = LinkClicked;
             if (handler != null)
-                handler(id);
+                handler(entry);
         }
 
         #endregion

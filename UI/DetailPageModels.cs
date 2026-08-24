@@ -1,5 +1,5 @@
 using System.Collections.Generic;
-using VRage.Game;
+using SEpedia.Core;
 
 namespace SEpedia.UI
 {
@@ -13,13 +13,13 @@ namespace SEpedia.UI
     internal sealed class DetailItem
     {
         public string Text { get; private set; }
-        public MyDefinitionId? LinkId { get; private set; }
+        public CatalogEntry Link { get; private set; }
         public string ToolTip { get; private set; }
 
-        public DetailItem(string text, MyDefinitionId? linkId = null, string toolTip = null)
+        public DetailItem(string text, CatalogEntry link = null, string toolTip = null)
         {
             Text = text ?? string.Empty;
-            LinkId = linkId;
+            Link = link;
             ToolTip = toolTip ?? string.Empty;
         }
     }

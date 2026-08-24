@@ -206,7 +206,10 @@ namespace SEpedia.UI
                 UiTheme.CatalogPageSize,
                 includedDefinition);
             if (includedDefinition == null &&
-                filter.ReconcileAvailableFacets(currentResults.Sources, currentResults.BlockTypes))
+                filter.ReconcileAvailableFacets(
+                    currentResults.Sources,
+                    currentResults.BlockTypes,
+                    currentResults.CelestialKinds))
                 currentResults = catalog.Query(filter, offset, UiTheme.CatalogPageSize);
             pager.Configure(currentResults.TotalCount, UiTheme.CatalogPageSize);
             updating = true;

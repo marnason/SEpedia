@@ -13,10 +13,12 @@ namespace SEpedia.UI
         #region State and Construction
 
         private readonly DefinitionIndex index;
+        private readonly CelestialIndex celestial;
 
-        public DetailPageComposer(DefinitionIndex index)
+        public DetailPageComposer(DefinitionIndex index, CelestialIndex celestial)
         {
             this.index = index;
+            this.celestial = celestial;
         }
 
         #endregion
@@ -42,7 +44,7 @@ namespace SEpedia.UI
             if (definition.CubeBlock != null)
                 AddBlock(rows, definition.CubeBlock);
             if (definition.PlanetGenerator != null)
-                AddPlanetGenerator(rows, definition.PlanetGenerator);
+                AddPlanetGenerator(rows, definition.Id, definition.PlanetGenerator);
             if (definition.AsteroidGenerator != null)
                 AddAsteroidGenerator(rows, definition.AsteroidGenerator);
             AddReverseRelationships(rows, definition.Id);
@@ -82,8 +84,6 @@ namespace SEpedia.UI
                     true,
                     false);
             }
-            if (planet.GeneratorData != null)
-                AddPlanetGenerator(rows, planet.GeneratorData);
 
             return new DetailPageModel(
                 planet.DisplayName,
@@ -129,7 +129,10 @@ namespace SEpedia.UI
             AddPaged(rows, "Components", components, false, true);
         }
 
-        private static void AddPlanetGenerator(IList<DetailRowModel> rows, PlanetGeneratorData planet)
+        private void AddPlanetGenerator(
+            IList<DetailRowModel> rows,
+            MyDefinitionId generatorId,
+            PlanetGeneratorData planet)
         {
             AddHeading(rows, "Planet statistics");
             AddField(rows, "Surface gravity", planet.SurfaceGravity.ToString("0.###") + " g");
@@ -145,6 +148,13 @@ namespace SEpedia.UI
             AddField(rows, "Weather interval", planet.WeatherFrequencyMin + "–" + planet.WeatherFrequencyMax);
             if (!string.IsNullOrWhiteSpace(planet.PersistentWeather))
                 AddField(rows, "Persistent weather", planet.PersistentWeather);
+
+            AddPaged(
+                rows,
+                "Spawned planets",
+                CreateSpawnedPlanetItems(generatorId),
+                false,
+                false);
 
             var weather = new List<DetailItem>();
             for (int index = 0; index < planet.WeatherTypes.Count; index++)
@@ -182,6 +192,25 @@ namespace SEpedia.UI
 
         #region Relationship Items
 
+        private List<DetailItem> CreateSpawnedPlanetItems(MyDefinitionId generatorId)
+        {
+            var items = new List<DetailItem>();
+            if (celestial == null)
+                return items;
+
+            IReadOnlyList<PlanetSnapshot> planets = celestial.Planets;
+            for (int index = 0; index < planets.Count; index++)
+            {
+                PlanetSnapshot planet = planets[index];
+                if (!planet.GeneratorId.HasValue || planet.GeneratorId.Value != generatorId)
+                    continue;
+
+                var entry = new CatalogEntry(planet);
+                items.Add(new DetailItem(entry.DisplayName, entry));
+            }
+            return items;
+        }
+
         private void AddReverseRelationships(IList<DetailRowModel> rows, MyDefinitionId definitionId)
         {
             IReadOnlyList<RecipeDocument> producing = index.Recipes.GetMenuProducingRecipes(definitionId);
@@ -208,9 +237,10 @@ namespace SEpedia.UI
             {
                 RecipeDocument recipe = recipes[index];
                 MyFixedPoint amount = GetAmount(consumed ? recipe.Prerequisites : recipe.Results, itemId);
+                CatalogEntry link = CreateDefinitionLink(recipe.DefinitionId);
                 items.Add(new DetailItem(
                     GetDefinitionName(recipe.DefinitionId) + " – " + FormatAmount(amount, itemId).TrimEnd(),
-                    recipe.DefinitionId,
+                    link,
                     BuildRecipeToolTip(recipe)));
             }
             return items;
@@ -277,7 +307,7 @@ namespace SEpedia.UI
                     continue;
                 }
                 string grid = block.CubeBlock != null ? " – " + block.CubeBlock.CubeSize + " grid" : string.Empty;
-                items.Add(new DetailItem(block.UiDisplayName + grid, block.Id));
+                items.Add(new DetailItem(block.UiDisplayName + grid, new CatalogEntry(block)));
             }
             return items;
         }
@@ -287,7 +317,15 @@ namespace SEpedia.UI
             DefinitionDocument target;
             if (!index.TryGet(definitionId, out target))
                 return new DetailItem(prefix + definitionId + " (definition unavailable)");
-            return new DetailItem(prefix + target.UiDisplayName, definitionId);
+            return new DetailItem(prefix + target.UiDisplayName, new CatalogEntry(target));
+        }
+
+        private CatalogEntry CreateDefinitionLink(MyDefinitionId definitionId)
+        {
+            DefinitionDocument target;
+            return index.TryGet(definitionId, out target)
+                ? new CatalogEntry(target)
+                : null;
         }
 
         private string GetDefinitionName(MyDefinitionId definitionId)

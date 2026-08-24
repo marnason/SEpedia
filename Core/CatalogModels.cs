@@ -20,7 +20,8 @@ namespace SEpedia.Core
         public BrowseCategory Category { get; private set; }
         public string DisplayName { get; private set; }
         public string StableKey { get; private set; }
-        public int CelestialSortOrder { get; private set; }
+        public string CelestialKindKey { get; private set; }
+        public string CelestialKindDisplayName { get; private set; }
 
         public bool IsSpawnedPlanet
         {
@@ -59,22 +60,67 @@ namespace SEpedia.Core
 
         #region Construction
 
-        public CatalogEntry(DefinitionDocument definition, int celestialSortOrder)
+        public CatalogEntry(DefinitionDocument definition)
+            : this(
+                definition,
+                GetDefinitionCelestialKindKey(definition),
+                GetDefinitionCelestialKindDisplayName(definition))
+        {
+        }
+
+        public CatalogEntry(
+            DefinitionDocument definition,
+            string celestialKindKey,
+            string celestialKindDisplayName)
         {
             Definition = definition;
             Category = definition.BrowseCategory;
-            DisplayName = definition.UiDisplayName;
             StableKey = "definition:" + definition.Id;
-            CelestialSortOrder = celestialSortOrder;
+            if (Category == BrowseCategory.Celestial)
+            {
+                CelestialKindKey = celestialKindKey ?? string.Empty;
+                CelestialKindDisplayName = celestialKindDisplayName ?? string.Empty;
+                DisplayName = definition.UiDisplayName + " (" +
+                    CelestialKindDisplayName.ToLowerInvariant() + ")";
+            }
+            else
+            {
+                CelestialKindKey = string.Empty;
+                CelestialKindDisplayName = string.Empty;
+                DisplayName = definition.UiDisplayName;
+            }
         }
 
         public CatalogEntry(PlanetSnapshot planet)
         {
             Planet = planet;
             Category = BrowseCategory.Celestial;
-            DisplayName = planet.DisplayName;
+            DisplayName = planet.DisplayName + " (spawned)";
             StableKey = "planet:" + planet.EntityId;
-            CelestialSortOrder = 0;
+            CelestialKindKey = "spawned";
+            CelestialKindDisplayName = "Spawned";
+        }
+
+        private static string GetDefinitionCelestialKindKey(DefinitionDocument definition)
+        {
+            if (definition.PlanetGenerator != null)
+                return "generator-planet";
+            if (definition.AsteroidGenerator != null)
+                return "generator-asteroid";
+            return definition.BrowseCategory == BrowseCategory.Celestial
+                ? "generator"
+                : string.Empty;
+        }
+
+        private static string GetDefinitionCelestialKindDisplayName(DefinitionDocument definition)
+        {
+            if (definition.PlanetGenerator != null)
+                return "Generator - Planet";
+            if (definition.AsteroidGenerator != null)
+                return "Generator - Asteroid";
+            return definition.BrowseCategory == BrowseCategory.Celestial
+                ? "Generator"
+                : string.Empty;
         }
 
         #endregion
@@ -93,6 +139,7 @@ namespace SEpedia.Core
         public HashSet<string> SelectedSourceKeys { get; private set; }
         public HashSet<MyCubeSize> SelectedGridSizes { get; private set; }
         public HashSet<string> SelectedBlockTypes { get; private set; }
+        public HashSet<string> SelectedCelestialKinds { get; private set; }
         private TriStateFilter defaultSurvivalState;
 
         #endregion
@@ -104,6 +151,7 @@ namespace SEpedia.Core
             SelectedSourceKeys = new HashSet<string>(StringComparer.Ordinal);
             SelectedGridSizes = new HashSet<MyCubeSize>();
             SelectedBlockTypes = new HashSet<string>(StringComparer.Ordinal);
+            SelectedCelestialKinds = new HashSet<string>(StringComparer.Ordinal);
             Category = BrowseCategory.Components;
             SearchText = string.Empty;
             ResetAdvanced(survivalMode);
@@ -121,6 +169,7 @@ namespace SEpedia.Core
             SelectedGridSizes.Add(MyCubeSize.Small);
             SelectedGridSizes.Add(MyCubeSize.Large);
             SelectedBlockTypes.Clear();
+            SelectedCelestialKinds.Clear();
         }
 
         public int GetActiveAdvancedFilterCount()
@@ -146,6 +195,8 @@ namespace SEpedia.Core
                 if (SelectedBlockTypes.Count > 0)
                     count++;
             }
+            if (Category == BrowseCategory.Celestial && SelectedCelestialKinds.Count > 0)
+                count++;
             return count;
         }
 
@@ -159,22 +210,25 @@ namespace SEpedia.Core
             {
                 SelectedBlockTypes.Clear();
                 SelectedGridSizes.Clear();
-                return;
             }
-
-            if (SelectedGridSizes.Count == 0)
+            else if (SelectedGridSizes.Count == 0)
             {
                 SelectedGridSizes.Add(MyCubeSize.Small);
                 SelectedGridSizes.Add(MyCubeSize.Large);
             }
+
+            if (Category != BrowseCategory.Celestial)
+                SelectedCelestialKinds.Clear();
         }
 
         public bool ReconcileAvailableFacets(
             IReadOnlyList<FacetCount> sources,
-            IReadOnlyList<FacetCount> blockTypes)
+            IReadOnlyList<FacetCount> blockTypes,
+            IReadOnlyList<FacetCount> celestialKinds)
         {
             bool changed = RemoveUnavailableSelections(SelectedSourceKeys, sources);
             changed |= RemoveUnavailableSelections(SelectedBlockTypes, blockTypes);
+            changed |= RemoveUnavailableSelections(SelectedCelestialKinds, celestialKinds);
             return changed;
         }
 
@@ -216,17 +270,20 @@ namespace SEpedia.Core
         public int TotalCount { get; private set; }
         public IReadOnlyList<FacetCount> Sources { get; private set; }
         public IReadOnlyList<FacetCount> BlockTypes { get; private set; }
+        public IReadOnlyList<FacetCount> CelestialKinds { get; private set; }
 
         public CatalogResult(
             IList<CatalogEntry> items,
             int totalCount,
             IList<FacetCount> sources,
-            IList<FacetCount> blockTypes)
+            IList<FacetCount> blockTypes,
+            IList<FacetCount> celestialKinds)
         {
             Items = new List<CatalogEntry>(items).AsReadOnly();
             TotalCount = totalCount;
             Sources = new List<FacetCount>(sources).AsReadOnly();
             BlockTypes = new List<FacetCount>(blockTypes).AsReadOnly();
+            CelestialKinds = new List<FacetCount>(celestialKinds).AsReadOnly();
         }
     }
 }

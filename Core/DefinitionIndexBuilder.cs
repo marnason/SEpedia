@@ -18,7 +18,13 @@ namespace SEpedia.Core
                 throw new ArgumentNullException("manager");
 
             var diagnostics = new DefinitionBuildDiagnostics(logWarning);
-            List<MyDefinitionBase> sourceDefinitions = CollectDefinitions(manager, diagnostics);
+            int planetGeneratorCount;
+            int asteroidGeneratorCount;
+            List<MyDefinitionBase> sourceDefinitions = CollectDefinitions(
+                manager,
+                diagnostics,
+                out planetGeneratorCount,
+                out asteroidGeneratorCount);
             DefinitionRelationships relationships = DefinitionRelationships.Build(
                 manager,
                 sourceDefinitions,
@@ -62,7 +68,9 @@ namespace SEpedia.Core
             return new DefinitionIndex(
                 documents,
                 sourceDefinitions.Count,
-                diagnostics.IssueCount);
+                diagnostics.IssueCount,
+                planetGeneratorCount,
+                asteroidGeneratorCount);
         }
 
         #endregion
@@ -71,20 +79,22 @@ namespace SEpedia.Core
 
         private static List<MyDefinitionBase> CollectDefinitions(
             MyDefinitionManager manager,
-            DefinitionBuildDiagnostics diagnostics)
+            DefinitionBuildDiagnostics diagnostics,
+            out int planetGeneratorCount,
+            out int asteroidGeneratorCount)
         {
             var definitions = new List<MyDefinitionBase>();
             var ids = new HashSet<MyDefinitionId>();
             var blockBlueprintIds = new HashSet<MyDefinitionId>();
+            planetGeneratorCount = 0;
+            asteroidGeneratorCount = 0;
 
             try
             {
                 foreach (MyDefinitionBase definition in manager.GetAllDefinitions())
                 {
-                    definitions.Add(definition);
                     if (definition != null)
                     {
-                        ids.Add(definition.Id);
                         if (definition is MyCubeBlockDefinition)
                         {
                             blockBlueprintIds.Add(new MyDefinitionId(
@@ -92,6 +102,7 @@ namespace SEpedia.Core
                                 definition.Id.ToString().Replace("MyObjectBuilder_", string.Empty)));
                         }
                     }
+                    AddDefinition(definitions, ids, definition);
                 }
             }
             catch (Exception exception)
@@ -108,8 +119,8 @@ namespace SEpedia.Core
                 // GetAllDefinitions() in the game runtime.
                 foreach (MyBlueprintDefinitionBase blueprint in manager.GetBlueprintDefinitions())
                 {
-                    if (blueprint != null && !blockBlueprintIds.Contains(blueprint.Id) && ids.Add(blueprint.Id))
-                        definitions.Add(blueprint);
+                    if (blueprint != null && !blockBlueprintIds.Contains(blueprint.Id))
+                        AddDefinition(definitions, ids, blueprint);
                 }
             }
             catch (Exception exception)
@@ -120,7 +131,56 @@ namespace SEpedia.Core
                     exception);
             }
 
+            try
+            {
+                foreach (MyPlanetGeneratorDefinition planet in manager.GetPlanetsGeneratorsDefinitions())
+                {
+                    if (planet != null)
+                        planetGeneratorCount++;
+                    AddDefinition(definitions, ids, planet);
+                }
+            }
+            catch (Exception exception)
+            {
+                diagnostics.Report(
+                    "planet-generator-registry",
+                    "Could not enumerate the planet generator registry",
+                    exception);
+            }
+
+            try
+            {
+                foreach (MyAsteroidGeneratorDefinition asteroid in manager.GetAsteroidGeneratorDefinitions().Values)
+                {
+                    if (asteroid != null)
+                        asteroidGeneratorCount++;
+                    AddDefinition(definitions, ids, asteroid);
+                }
+            }
+            catch (Exception exception)
+            {
+                diagnostics.Report(
+                    "asteroid-generator-registry",
+                    "Could not enumerate the asteroid generator registry",
+                    exception);
+            }
+
             return definitions;
+        }
+
+        private static void AddDefinition(
+            ICollection<MyDefinitionBase> definitions,
+            ISet<MyDefinitionId> ids,
+            MyDefinitionBase definition)
+        {
+            if (definition == null)
+            {
+                definitions.Add(null);
+                return;
+            }
+
+            if (ids.Add(definition.Id))
+                definitions.Add(definition);
         }
 
         #endregion

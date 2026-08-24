@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using RichHudFramework.UI;
 using RichHudFramework.UI.Rendering;
-using VRage.Game;
+using SEpedia.Core;
 using VRageMath;
 
 namespace SEpedia.UI
@@ -13,7 +13,7 @@ namespace SEpedia.UI
 
         private static readonly IReadOnlyList<DetailItem> EmptyItems = new List<DetailItem>().AsReadOnly();
 
-        private readonly Action<MyDefinitionId> linkClicked;
+        private readonly Action<CatalogEntry> linkClicked;
         private readonly Label heading;
         private readonly LabelButton[] slots;
         private readonly PagerRow pager;
@@ -26,7 +26,7 @@ namespace SEpedia.UI
         #region Construction
 
         public PagedDetailSection(
-            Action<MyDefinitionId> linkClicked,
+            Action<CatalogEntry> linkClicked,
             string headingText,
             IReadOnlyList<DetailItem> sectionItems,
             bool majorHeading)
@@ -98,9 +98,9 @@ namespace SEpedia.UI
         private void Activate(int slotIndex)
         {
             int itemIndex = pager.Page * UiTheme.DetailSectionPageSize + slotIndex;
-            if (itemIndex >= items.Count || !items[itemIndex].LinkId.HasValue || linkClicked == null)
+            if (itemIndex >= items.Count || items[itemIndex].Link == null || linkClicked == null)
                 return;
-            linkClicked(items[itemIndex].LinkId.Value);
+            linkClicked(items[itemIndex].Link);
         }
 
         private void UpdateSlots()
@@ -120,7 +120,7 @@ namespace SEpedia.UI
                 }
 
                 DetailItem item = items[itemIndex];
-                bool linked = item.LinkId.HasValue;
+                bool linked = item.Link != null;
                 slot.Text = new RichText(
                     item.Text,
                     linked

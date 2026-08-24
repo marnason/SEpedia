@@ -17,6 +17,8 @@ namespace SEpedia.Core
         public RecipeIndex Recipes { get; private set; }
         public int SourceCount { get; private set; }
         public int IssueCount { get; private set; }
+        public int PlanetGeneratorCount { get; private set; }
+        public int AsteroidGeneratorCount { get; private set; }
 
         #endregion
 
@@ -25,7 +27,9 @@ namespace SEpedia.Core
         public DefinitionIndex(
             IList<DefinitionDocument> definitions,
             int sourceCount,
-            int issueCount)
+            int issueCount,
+            int planetGeneratorCount,
+            int asteroidGeneratorCount)
         {
             var sorted = new List<DefinitionDocument>(definitions);
             sorted.Sort(CompareDefinitions);
@@ -56,6 +60,8 @@ namespace SEpedia.Core
             Recipes = new RecipeIndex(recipes);
             SourceCount = sourceCount;
             IssueCount = issueCount;
+            PlanetGeneratorCount = planetGeneratorCount;
+            AsteroidGeneratorCount = asteroidGeneratorCount;
         }
 
         private static void AddBlockUsage(

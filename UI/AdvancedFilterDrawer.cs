@@ -23,7 +23,9 @@ namespace SEpedia.UI
         private readonly NamedCheckBox smallGrid;
         private readonly NamedCheckBox largeGrid;
         private readonly List<ScrollBoxEntry> blockOnlyEntries;
+        private readonly List<ScrollBoxEntry> celestialOnlyEntries;
         private readonly PagedFacetSection blockTypes;
+        private readonly PagedFacetSection celestialKinds;
         private readonly PagedFacetSection sources;
         private BrowseCategory lastCategory;
         private bool updating;
@@ -36,6 +38,7 @@ namespace SEpedia.UI
         {
             this.filter = filter;
             blockOnlyEntries = new List<ScrollBoxEntry>();
+            celestialOnlyEntries = new List<ScrollBoxEntry>();
             lastCategory = filter.Category;
             Width = 300f;
 
@@ -74,6 +77,15 @@ namespace SEpedia.UI
                 RaiseChanged,
                 blockOnlyEntries);
 
+            celestialKinds = new PagedFacetSection(
+                content,
+                "Celestial type",
+                "All celestial types",
+                filter.SelectedCelestialKinds,
+                false,
+                RaiseChanged,
+                celestialOnlyEntries);
+
             sources = new PagedFacetSection(
                 content,
                 "Source",
@@ -111,6 +123,15 @@ namespace SEpedia.UI
                     blockTypes.Update(result.BlockTypes, true);
                 else
                     blockTypes.SetEnabled(false);
+
+                bool showCelestialFilters = filter.Category == BrowseCategory.Celestial;
+                for (int index = 0; index < celestialOnlyEntries.Count; index++)
+                    celestialOnlyEntries[index].Enabled = showCelestialFilters;
+
+                if (showCelestialFilters)
+                    celestialKinds.Update(result.CelestialKinds, true);
+                else
+                    celestialKinds.SetEnabled(false);
 
                 sources.Update(result.Sources, true);
             }

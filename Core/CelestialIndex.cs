@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Sandbox.Game.Entities;
 using Sandbox.ModAPI;
+using VRage.Game;
 using VRage.ModAPI;
 
 namespace SEpedia.Core
@@ -15,6 +16,7 @@ namespace SEpedia.Core
         private readonly DefinitionIndex definitions;
         private readonly Action<string> logWarning;
         private readonly Dictionary<long, PlanetSnapshot> planets;
+        private readonly HashSet<MyDefinitionId> unresolvedGeneratorIds;
         private bool subscribed;
 
         public IReadOnlyList<PlanetSnapshot> Planets
@@ -36,6 +38,7 @@ namespace SEpedia.Core
             this.definitions = definitions;
             this.logWarning = logWarning;
             planets = new Dictionary<long, PlanetSnapshot>();
+            unresolvedGeneratorIds = new HashSet<MyDefinitionId>();
         }
 
         public void Initialize()
@@ -63,6 +66,7 @@ namespace SEpedia.Core
 
             subscribed = false;
             planets.Clear();
+            unresolvedGeneratorIds.Clear();
             Changed = null;
         }
 
@@ -93,7 +97,11 @@ namespace SEpedia.Core
             {
                 DefinitionDocument generatorDocument = null;
                 if (planet.Generator != null)
+                {
                     definitions.TryGet(planet.Generator.Id, out generatorDocument);
+                    if (generatorDocument == null && unresolvedGeneratorIds.Add(planet.Generator.Id))
+                        Warn("Planet generator definition " + planet.Generator.Id + " is unavailable.");
+                }
 
                 string name = !string.IsNullOrWhiteSpace(planet.DisplayNameText)
                     ? planet.DisplayNameText
@@ -114,7 +122,6 @@ namespace SEpedia.Core
                     generatorDocument == null || generatorDocument.IsEnabled,
                     generatorDocument == null || generatorDocument.IsPublic,
                     generatorDocument == null || generatorDocument.IsAvailableInSurvival,
-                    generatorDocument != null ? generatorDocument.PlanetGenerator : null,
                     generatorDocument != null);
 
                 planets[planet.EntityId] = snapshot;
