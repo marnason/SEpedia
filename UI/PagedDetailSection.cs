@@ -29,7 +29,8 @@ namespace SEpedia.UI
             Action<CatalogEntry> linkClicked,
             string headingText,
             IReadOnlyList<DetailItem> sectionItems,
-            bool majorHeading)
+            bool majorHeading,
+            int hiddenItemCount)
         {
             this.linkClicked = linkClicked;
             items = sectionItems ?? EmptyItems;
@@ -37,7 +38,9 @@ namespace SEpedia.UI
             heading = new Label
             {
                 Text = new RichText(
-                    headingText,
+                    hiddenItemCount > 0
+                        ? headingText + " (" + hiddenItemCount + " hidden by filters)"
+                        : headingText,
                     majorHeading ? GlyphFormat.Blueish.WithSize(1.02f) : GlyphFormat.White.WithSize(.92f)),
                 Height = majorHeading ? 31f : 25f,
                 AutoResize = false,

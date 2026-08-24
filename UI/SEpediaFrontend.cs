@@ -11,6 +11,7 @@ namespace SEpedia.UI
         public event Action RefreshRequested;
 
         private BindingConfigController bindings;
+        private CatalogSchema schema;
         private EncyclopediaWindow window;
         private DefinitionIndex index;
         private CelestialIndex celestial;
@@ -30,6 +31,8 @@ namespace SEpedia.UI
 
             try
             {
+                if (schema == null)
+                    schema = CatalogSchema.CreateBuiltIn();
                 bindings = new BindingConfigController();
                 bindings.ToggleRequested += OnToggleRequested;
                 TryCreateWindow();
@@ -56,6 +59,7 @@ namespace SEpedia.UI
             index = null;
             celestial = null;
             filter = null;
+            schema = null;
             pendingOpen = false;
         }
 
@@ -78,7 +82,11 @@ namespace SEpedia.UI
             celestial = celestialIndex;
             survivalMode = isSurvivalMode;
             if (filter == null)
-                filter = new CatalogFilter(survivalMode);
+            {
+                if (schema == null)
+                    schema = CatalogSchema.CreateBuiltIn();
+                filter = new CatalogFilter(schema, survivalMode);
+            }
             TryCreateWindow();
             if (reopen && window != null)
                 window.Toggle();

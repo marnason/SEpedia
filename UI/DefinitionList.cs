@@ -31,6 +31,7 @@ namespace SEpedia.UI
         private int pendingRevealIndex;
         private bool revealLayoutReady;
         private bool updating;
+        private bool suppressSelectionNotification;
 
         public CatalogEntry First
         {
@@ -71,7 +72,7 @@ namespace SEpedia.UI
             this.definitions = definitions;
             this.filter = filter;
             this.survivalMode = survivalMode;
-            catalog = new CatalogIndex(definitions, planets);
+            catalog = new CatalogIndex(filter.Schema, filter.EntryVisibility, definitions, planets);
             pendingRevealIndex = -1;
             revealLayoutReady = false;
             categoryBar = new CategoryBar(filter, Refresh);
@@ -185,6 +186,19 @@ namespace SEpedia.UI
             RefreshResults();
         }
 
+        public void RefreshWithoutSelectionNotification()
+        {
+            suppressSelectionNotification = true;
+            try
+            {
+                Refresh();
+            }
+            finally
+            {
+                suppressSelectionNotification = false;
+            }
+        }
+
         private void RefreshPage()
         {
             RefreshResults();
@@ -208,8 +222,7 @@ namespace SEpedia.UI
             if (includedDefinition == null &&
                 filter.ReconcileAvailableFacets(
                     currentResults.Sources,
-                    currentResults.BlockTypes,
-                    currentResults.CelestialKinds))
+                    currentResults.Facets))
                 currentResults = catalog.Query(filter, offset, UiTheme.CatalogPageSize);
             pager.Configure(currentResults.TotalCount, UiTheme.CatalogPageSize);
             updating = true;
@@ -227,7 +240,8 @@ namespace SEpedia.UI
                         selectedIndex = itemIndex;
                 }
 
-                if (currentResults.Items.Count > 0)
+                if (currentResults.Items.Count > 0 &&
+                    (selectedIndex >= 0 || !suppressSelectionNotification))
                     list.SetSelectionAt(selectedIndex >= 0 ? selectedIndex : 0);
             }
             finally
@@ -236,7 +250,7 @@ namespace SEpedia.UI
             }
             ScrollToTop();
 
-            string categoryName = CatalogText.GetCategoryName(filter.Category).ToLowerInvariant();
+            string categoryName = CatalogText.GetCategoryName(filter.Schema, filter.CategoryKey).ToLowerInvariant();
             int first = pager.Page * UiTheme.CatalogPageSize + 1;
             int last = pager.Page * UiTheme.CatalogPageSize + currentResults.Items.Count;
             status.Text = currentResults.TotalCount > UiTheme.CatalogPageSize
@@ -244,7 +258,7 @@ namespace SEpedia.UI
                 : currentResults.TotalCount + " " + categoryName;
             UpdateActiveFilterStatus();
 
-            if (list.Value != null)
+            if (list.Value != null && !suppressSelectionNotification)
                 RaiseSelectionChanged(list.Value.AssocMember, false);
 
             Action resultsHandler = ResultsChanged;
@@ -254,16 +268,16 @@ namespace SEpedia.UI
 
         public void RebuildCatalog(IEnumerable<PlanetSnapshot> planets)
         {
-            catalog = new CatalogIndex(definitions, planets);
+            catalog = new CatalogIndex(filter.Schema, filter.EntryVisibility, definitions, planets);
             RefreshCategoryAvailability();
             Refresh();
         }
 
         private void RefreshCategoryAvailability()
         {
-            categoryBar.UpdateAvailability(delegate(BrowseCategory category)
+            categoryBar.UpdateAvailability(delegate(CatalogCategoryDefinition category)
             {
-                return catalog.HasMultipleDefaultEntries(category, survivalMode);
+                return category.IsAvailable(catalog, survivalMode);
             });
         }
 
@@ -374,10 +388,10 @@ namespace SEpedia.UI
         public bool TryReveal(DefinitionDocument definition)
         {
             includedDefinition = null;
-            if (definition == null || definition.BrowseCategory == BrowseCategory.None)
+            if (definition == null || string.IsNullOrEmpty(definition.CategoryKey))
                 return false;
 
-            filter.Category = definition.BrowseCategory;
+            filter.CategoryKey = definition.CategoryKey;
             filter.NormalizeForCategory();
             categoryBar.UpdateSelection();
             includedDefinition = definition;

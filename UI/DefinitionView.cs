@@ -24,9 +24,10 @@ namespace SEpedia.UI
         public DefinitionView(
             DefinitionIndex index,
             CelestialIndex celestial,
+            CatalogFilter filter,
             HudParentBase parent = null) : base(parent)
         {
-            composer = new DetailPageComposer(index, celestial);
+            composer = new DetailPageComposer(index, celestial, filter);
             rows = new List<HudElementBase>();
             pagedSections = new List<PagedDetailSection>();
             lastRowWidth = -1f;
@@ -51,7 +52,7 @@ namespace SEpedia.UI
 
         public void Show(DefinitionDocument definition)
         {
-            Render(composer.Compose(definition));
+            Render(composer.Compose(new CatalogEntry(definition)));
         }
 
         public void Show(CatalogEntry entry)
@@ -61,9 +62,7 @@ namespace SEpedia.UI
                 ShowMessage("Select an entry to inspect it.");
                 return;
             }
-            Render(entry.Definition != null
-                ? composer.Compose(entry.Definition)
-                : composer.Compose(entry.Planet));
+            Render(composer.Compose(entry));
         }
 
         public void ShowMessage(string message)
@@ -120,16 +119,16 @@ namespace SEpedia.UI
                         AddKeyValue(row.Label, row.Value);
                         break;
                     case DetailRowKind.PagedSection:
-                        AddPagedSection(row.Label, row.Items, row.Major);
+                        AddPagedSection(row.Label, row.Items, row.Major, row.HiddenItemCount);
                         break;
                 }
             }
             ScrollToTop();
         }
 
-        private void AddPagedSection(string heading, IReadOnlyList<DetailItem> items, bool major)
+        private void AddPagedSection(string heading, IReadOnlyList<DetailItem> items, bool major, int hiddenItemCount)
         {
-            var section = new PagedDetailSection(RaiseLinkClicked, heading, items, major);
+            var section = new PagedDetailSection(RaiseLinkClicked, heading, items, major, hiddenItemCount);
             pagedSections.Add(section);
             AddRow(section.Root);
         }

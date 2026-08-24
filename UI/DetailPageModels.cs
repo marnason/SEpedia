@@ -24,6 +24,20 @@ namespace SEpedia.UI
         }
     }
 
+    internal sealed class DetailRelationshipCandidate
+    {
+        public string Text { get; private set; }
+        public CatalogEntry Target { get; private set; }
+        public string ToolTip { get; private set; }
+
+        public DetailRelationshipCandidate(string text, CatalogEntry target = null, string toolTip = null)
+        {
+            Text = text ?? string.Empty;
+            Target = target;
+            ToolTip = toolTip ?? string.Empty;
+        }
+    }
+
     internal sealed class DetailRowModel
     {
         #region State
@@ -35,6 +49,7 @@ namespace SEpedia.UI
         public string Label { get; private set; }
         public string Value { get; private set; }
         public bool Major { get; private set; }
+        public int HiddenItemCount { get; private set; }
         public IReadOnlyList<DetailItem> Items { get; private set; }
 
         #endregion
@@ -46,12 +61,14 @@ namespace SEpedia.UI
             string label,
             string value,
             bool major,
-            IList<DetailItem> items)
+            IList<DetailItem> items,
+            int hiddenItemCount)
         {
             Kind = kind;
             Label = label ?? string.Empty;
             Value = value ?? string.Empty;
             Major = major;
+            HiddenItemCount = hiddenItemCount;
             Items = items != null
                 ? new List<DetailItem>(items).AsReadOnly()
                 : EmptyItems;
@@ -63,17 +80,17 @@ namespace SEpedia.UI
 
         public static DetailRowModel Heading(string text)
         {
-            return new DetailRowModel(DetailRowKind.Heading, text, null, true, null);
+            return new DetailRowModel(DetailRowKind.Heading, text, null, true, null, 0);
         }
 
         public static DetailRowModel Field(string label, string value)
         {
-            return new DetailRowModel(DetailRowKind.Field, label, value, false, null);
+            return new DetailRowModel(DetailRowKind.Field, label, value, false, null, 0);
         }
 
-        public static DetailRowModel Paged(string heading, IList<DetailItem> items, bool major)
+        public static DetailRowModel Paged(string heading, IList<DetailItem> items, bool major, int hiddenItemCount)
         {
-            return new DetailRowModel(DetailRowKind.PagedSection, heading, null, major, items);
+            return new DetailRowModel(DetailRowKind.PagedSection, heading, null, major, items, hiddenItemCount);
         }
 
         #endregion

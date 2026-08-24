@@ -29,7 +29,7 @@ namespace SEpedia.Core
         public DefinitionDocument Extract(MyDefinitionBase definition)
         {
             MyDefinitionId id = definition.Id;
-            BrowseCategory browseCategory = BrowseCategory.None;
+            string categoryKey = string.Empty;
             PhysicalItemData physical = null;
             RecipeDocument recipe = null;
             CubeBlockData block = null;
@@ -40,7 +40,7 @@ namespace SEpedia.Core
             if (physicalDefinition != null)
             {
                 physical = PhysicalDefinitionExtractor.Extract(physicalDefinition, diagnostics);
-                browseCategory = GetPhysicalBrowseCategory(physicalDefinition);
+                categoryKey = GetPhysicalCategoryKey(physicalDefinition);
             }
 
             MyBlueprintDefinitionBase blueprintDefinition = definition as MyBlueprintDefinitionBase;
@@ -51,13 +51,13 @@ namespace SEpedia.Core
                     relationships,
                     diagnostics);
                 if (recipe != null && recipe.IsProductionMenuReachable)
-                    browseCategory = BrowseCategory.Recipes;
+                    categoryKey = CatalogCategoryKeys.Recipes;
             }
 
             MyCubeBlockDefinition blockDefinition = definition as MyCubeBlockDefinition;
             if (blockDefinition != null)
             {
-                browseCategory = BrowseCategory.Blocks;
+                categoryKey = CatalogCategoryKeys.Blocks;
                 block = CubeBlockDefinitionExtractor.Extract(
                     blockDefinition,
                     relationships,
@@ -67,7 +67,7 @@ namespace SEpedia.Core
             MyPlanetGeneratorDefinition planetDefinition = definition as MyPlanetGeneratorDefinition;
             if (planetDefinition != null)
             {
-                browseCategory = BrowseCategory.Celestial;
+                categoryKey = CatalogCategoryKeys.Celestial;
                 planet = CelestialDefinitionExtractor.ExtractPlanet(
                     planetDefinition,
                     planetOreResolver,
@@ -77,7 +77,7 @@ namespace SEpedia.Core
             MyAsteroidGeneratorDefinition asteroidDefinition = definition as MyAsteroidGeneratorDefinition;
             if (asteroidDefinition != null)
             {
-                browseCategory = BrowseCategory.Celestial;
+                categoryKey = CatalogCategoryKeys.Celestial;
                 asteroid = CelestialDefinitionExtractor.ExtractAsteroid(asteroidDefinition, diagnostics);
             }
 
@@ -86,7 +86,7 @@ namespace SEpedia.Core
                 GetDisplayName(definition, id),
                 GetDescription(definition),
                 definition.GetType().FullName ?? definition.GetType().Name,
-                browseCategory,
+                categoryKey,
                 GetOrigin(definition),
                 definition.Enabled,
                 definition.Public,
@@ -190,17 +190,17 @@ namespace SEpedia.Core
 
         #region Category Selection
 
-        private static BrowseCategory GetPhysicalBrowseCategory(MyPhysicalItemDefinition definition)
+        private static string GetPhysicalCategoryKey(MyPhysicalItemDefinition definition)
         {
-            if (definition is MyComponentDefinition) return BrowseCategory.Components;
-            if (definition.IsOre) return BrowseCategory.Ores;
-            if (definition.IsIngot) return BrowseCategory.Ingots;
-            if (definition is MyAmmoMagazineDefinition) return BrowseCategory.Ammo;
-            if (definition is MyOxygenContainerDefinition) return BrowseCategory.ToolsAndWeapons;
-            if (definition is MyConsumableItemDefinition) return BrowseCategory.Consumables;
+            if (definition is MyComponentDefinition) return CatalogCategoryKeys.Components;
+            if (definition.IsOre) return CatalogCategoryKeys.Ores;
+            if (definition.IsIngot) return CatalogCategoryKeys.Ingots;
+            if (definition is MyAmmoMagazineDefinition) return CatalogCategoryKeys.Ammo;
+            if (definition is MyOxygenContainerDefinition) return CatalogCategoryKeys.ToolsAndWeapons;
+            if (definition is MyConsumableItemDefinition) return CatalogCategoryKeys.Consumables;
             if (definition is MyToolItemDefinition || definition is MyWeaponItemDefinition)
-                return BrowseCategory.ToolsAndWeapons;
-            return BrowseCategory.Items;
+                return CatalogCategoryKeys.ToolsAndWeapons;
+            return CatalogCategoryKeys.Items;
         }
 
         #endregion

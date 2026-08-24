@@ -13,13 +13,13 @@ namespace SEpedia.UI
 
         private sealed class CategoryButton
         {
-            public readonly BrowseCategory Category;
+            public readonly CatalogCategoryDefinition Category;
             public readonly LabelBoxButton Button;
             public readonly float MinimumWidth;
             public bool Available;
 
             public CategoryButton(
-                BrowseCategory category,
+                CatalogCategoryDefinition category,
                 LabelBoxButton button,
                 float minimumWidth)
             {
@@ -58,16 +58,8 @@ namespace SEpedia.UI
                 Spacing = RowSpacing
             };
 
-            Add(BrowseCategory.Components);
-            Add(BrowseCategory.Ores);
-            Add(BrowseCategory.Ingots);
-            Add(BrowseCategory.Ammo);
-            Add(BrowseCategory.ToolsAndWeapons);
-            Add(BrowseCategory.Consumables);
-            Add(BrowseCategory.Items);
-            Add(BrowseCategory.Blocks);
-            Add(BrowseCategory.Recipes);
-            Add(BrowseCategory.Celestial);
+            for (int index = 0; index < filter.Schema.Categories.Count; index++)
+                Add(filter.Schema.Categories[index]);
             Reflow(1);
             UpdateSelection();
         }
@@ -85,7 +77,7 @@ namespace SEpedia.UI
                 Reflow(availableButtons, rowCount);
         }
 
-        public void UpdateAvailability(Func<BrowseCategory, bool> isAvailable)
+        public void UpdateAvailability(Func<CatalogCategoryDefinition, bool> isAvailable)
         {
             CategoryButton firstAvailable = null;
             bool selectedAvailable = false;
@@ -98,11 +90,11 @@ namespace SEpedia.UI
                     continue;
                 if (firstAvailable == null)
                     firstAvailable = categoryButton;
-                selectedAvailable |= categoryButton.Category == filter.Category;
+                selectedAvailable |= categoryButton.Category.Key == filter.CategoryKey;
             }
 
             if (!selectedAvailable && firstAvailable != null)
-                filter.Category = firstAvailable.Category;
+                filter.CategoryKey = firstAvailable.Category.Key;
 
             List<CategoryButton> availableButtons = GetAvailableButtons();
             Reflow(availableButtons, GetRowCount(availableButtons, availableWidth));
@@ -153,7 +145,7 @@ namespace SEpedia.UI
             for (int index = 0; index < buttons.Count; index++)
             {
                 CategoryButton categoryButton = buttons[index];
-                bool selected = categoryButton.Category == filter.Category;
+                bool selected = categoryButton.Category.Key == filter.CategoryKey;
                 categoryButton.Button.Color = selected ? UiTheme.Selected : UiTheme.Panel;
                 categoryButton.Button.Format = selected
                     ? GlyphFormat.White.WithColor(UiTheme.SelectedText).WithAlignment(TextAlignment.Center).WithSize(.68f)
@@ -162,9 +154,9 @@ namespace SEpedia.UI
             }
         }
 
-        private void Add(BrowseCategory category)
+        private void Add(CatalogCategoryDefinition category)
         {
-            string name = CatalogText.GetCategoryName(category);
+            string name = category.DisplayName;
             var button = new LabelBoxButton
             {
                 Text = new RichText(name, GlyphFormat.White.WithAlignment(TextAlignment.Center).WithSize(.68f)),
@@ -177,9 +169,9 @@ namespace SEpedia.UI
             };
             button.MouseInput.LeftClicked += delegate
             {
-                if (filter.Category == category)
+                if (filter.CategoryKey == category.Key)
                     return;
-                filter.Category = category;
+                filter.CategoryKey = category.Key;
                 UpdateSelection();
                 if (categoryChanged != null)
                     categoryChanged();

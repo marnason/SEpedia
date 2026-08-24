@@ -23,11 +23,10 @@ namespace SEpedia.UI
         private readonly NamedCheckBox smallGrid;
         private readonly NamedCheckBox largeGrid;
         private readonly List<ScrollBoxEntry> blockOnlyEntries;
-        private readonly List<ScrollBoxEntry> celestialOnlyEntries;
-        private readonly PagedFacetSection blockTypes;
-        private readonly PagedFacetSection celestialKinds;
+        private readonly Dictionary<string, List<ScrollBoxEntry>> facetEntries;
+        private readonly Dictionary<string, PagedFacetSection> facetSections;
         private readonly PagedFacetSection sources;
-        private BrowseCategory lastCategory;
+        private string lastCategoryKey;
         private bool updating;
 
         #endregion
@@ -38,8 +37,9 @@ namespace SEpedia.UI
         {
             this.filter = filter;
             blockOnlyEntries = new List<ScrollBoxEntry>();
-            celestialOnlyEntries = new List<ScrollBoxEntry>();
-            lastCategory = filter.Category;
+            facetEntries = new Dictionary<string, List<ScrollBoxEntry>>(StringComparer.Ordinal);
+            facetSections = new Dictionary<string, PagedFacetSection>(StringComparer.Ordinal);
+            lastCategoryKey = filter.CategoryKey;
             Width = 300f;
 
             content = new ScrollBox(this)
@@ -55,9 +55,9 @@ namespace SEpedia.UI
             var definitionSection = new FilterSectionPanel(content);
             definitionSection.Add(CreateHeading("Definition flags"));
 
-            enabledFilter = AddTriState(definitionSection, "Enabled", delegate(TriStateFilter value) { filter.EnabledState = value; });
-            publicFilter = AddTriState(definitionSection, "Public", delegate(TriStateFilter value) { filter.PublicState = value; });
-            survivalFilter = AddTriState(definitionSection, "Survival", delegate(TriStateFilter value) { filter.SurvivalState = value; });
+            enabledFilter = AddTriState(definitionSection, "Enabled", delegate(TriStateFilter value) { filter.Visibility.EnabledState = value; });
+            publicFilter = AddTriState(definitionSection, "Public", delegate(TriStateFilter value) { filter.Visibility.PublicState = value; });
+            survivalFilter = AddTriState(definitionSection, "Survival", delegate(TriStateFilter value) { filter.Visibility.SurvivalState = value; });
 
             var availabilitySection = new FilterSectionPanel(content, blockOnlyEntries);
             availabilitySection.Add(CreateHeading("Block availability"));
@@ -68,29 +68,32 @@ namespace SEpedia.UI
             smallGrid = AddGridSize(gridSection, "Small", MyCubeSize.Small);
             largeGrid = AddGridSize(gridSection, "Large", MyCubeSize.Large);
 
-            blockTypes = new PagedFacetSection(
-                content,
-                "Runtime block type",
-                "All block types",
-                filter.SelectedBlockTypes,
-                true,
-                RaiseChanged,
-                blockOnlyEntries);
-
-            celestialKinds = new PagedFacetSection(
-                content,
-                "Celestial type",
-                "All celestial types",
-                filter.SelectedCelestialKinds,
-                false,
-                RaiseChanged,
-                celestialOnlyEntries);
+            for (int categoryIndex = 0; categoryIndex < filter.Schema.Categories.Count; categoryIndex++)
+            {
+                CatalogCategoryDefinition category = filter.Schema.Categories[categoryIndex];
+                for (int facetIndex = 0; facetIndex < category.Facets.Count; facetIndex++)
+                {
+                    CatalogFacetDefinition facet = category.Facets[facetIndex];
+                    if (facetSections.ContainsKey(facet.Key))
+                        continue;
+                    var entries = new List<ScrollBoxEntry>();
+                    facetEntries.Add(facet.Key, entries);
+                    facetSections.Add(facet.Key, new PagedFacetSection(
+                        content,
+                        facet.DisplayName,
+                        facet.AllDisplayName,
+                        filter.GetSelectedFacetValues(facet.Key),
+                        facet.ShowKeyTooltips,
+                        RaiseChanged,
+                        entries));
+                }
+            }
 
             sources = new PagedFacetSection(
                 content,
                 "Source",
                 "All sources",
-                filter.SelectedSourceKeys,
+                filter.Visibility.SelectedSourceKeys,
                 false,
                 RaiseChanged);
         }
@@ -104,34 +107,33 @@ namespace SEpedia.UI
             if (result == null)
                 return;
 
-            bool categoryChanged = lastCategory != filter.Category;
+            bool categoryChanged = lastCategoryKey != filter.CategoryKey;
             updating = true;
             try
             {
-                enabledFilter.SetSelectionAt((int)filter.EnabledState);
-                publicFilter.SetSelectionAt((int)filter.PublicState);
-                survivalFilter.SetSelectionAt((int)filter.SurvivalState);
+                enabledFilter.SetSelectionAt((int)filter.Visibility.EnabledState);
+                publicFilter.SetSelectionAt((int)filter.Visibility.PublicState);
+                survivalFilter.SetSelectionAt((int)filter.Visibility.SurvivalState);
                 buildMenuFilter.SetSelectionAt((int)filter.BuildMenuState);
                 smallGrid.Value = filter.SelectedGridSizes.Contains(MyCubeSize.Small);
                 largeGrid.Value = filter.SelectedGridSizes.Contains(MyCubeSize.Large);
 
-                bool showBlockFilters = filter.Category == BrowseCategory.Blocks;
+                bool showBlockFilters = filter.CategoryKey == CatalogCategoryKeys.Blocks;
                 for (int index = 0; index < blockOnlyEntries.Count; index++)
                     blockOnlyEntries[index].Enabled = showBlockFilters;
 
-                if (showBlockFilters)
-                    blockTypes.Update(result.BlockTypes, true);
-                else
-                    blockTypes.SetEnabled(false);
-
-                bool showCelestialFilters = filter.Category == BrowseCategory.Celestial;
-                for (int index = 0; index < celestialOnlyEntries.Count; index++)
-                    celestialOnlyEntries[index].Enabled = showCelestialFilters;
-
-                if (showCelestialFilters)
-                    celestialKinds.Update(result.CelestialKinds, true);
-                else
-                    celestialKinds.SetEnabled(false);
+                CatalogCategoryDefinition category = filter.Schema.GetCategory(filter.CategoryKey);
+                foreach (KeyValuePair<string, PagedFacetSection> pair in facetSections)
+                {
+                    bool showFacet = category != null && category.HasFacet(pair.Key);
+                    List<ScrollBoxEntry> entries = facetEntries[pair.Key];
+                    for (int index = 0; index < entries.Count; index++)
+                        entries[index].Enabled = showFacet;
+                    if (showFacet)
+                        pair.Value.Update(result.GetFacets(pair.Key), true);
+                    else
+                        pair.Value.SetEnabled(false);
+                }
 
                 sources.Update(result.Sources, true);
             }
@@ -144,7 +146,7 @@ namespace SEpedia.UI
             {
                 content.ScrollBar.Value = 0f;
                 content.Start = 0;
-                lastCategory = filter.Category;
+                lastCategoryKey = filter.CategoryKey;
             }
         }
 

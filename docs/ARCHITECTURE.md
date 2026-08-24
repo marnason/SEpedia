@@ -12,11 +12,13 @@ Cleanup runs in reverse ownership order and is idempotent. The window closes tex
 
 Failures at game or mod-data boundaries are isolated and summarized by `DefinitionBuildDiagnostics`. Extractors do not mutate relationship indexes.
 
-`CatalogIndex` owns search scoring, the 500-result bound, sorting, and facet counts. `DefinitionList` normalizes category state, reconciles unavailable selections once, and renders the result. Shared labels and recipe search text live in `CatalogText`.
+`CatalogSchema` supplies ordered category and facet descriptors using stable keys. Built-in categories use the same registry contract intended for future adapters. `CatalogIndex` owns search scoring, the 500-result bound, sorting, and dynamic facet counts. `DefinitionList` normalizes category state, reconciles unavailable selections once, and renders the result. Shared labels and recipe search text live in `CatalogText`.
+
+`CatalogEntryVisibility` is the single policy boundary for Enabled, Public, Survival, and Source. Catalog queries add category, search, block availability, grid size, and registered facets; detail relationships apply only the common policy.
 
 ## Detail and layout flow
 
-`DetailPageComposer` produces headings, fields, and bounded sections. `DefinitionView` renders that model and rebuilds rows only when navigation changes. Dynamic detail and facet collections reuse eight live slots plus a shared pager.
+`DetailPageComposer` orchestrates ordered providers over strongly typed definition and celestial data. Providers emit relationship candidates, and the central relationship builder applies common visibility before producing bounded detail rows. Filtered candidates contribute exact hidden counts while unresolved non-link metadata remains visible. `DefinitionView` renders that model and recomposes the current history entry when common visibility changes. Dynamic detail and facet collections reuse eight live slots plus a shared pager.
 
 Nested `HudChain` containers own row-and-column placement. Dynamic controls remain bounded because Rich HUD traverses retained nodes every frame.
 

@@ -9,22 +9,10 @@ namespace SEpedia.Core
     {
         #region Labels
 
-        public static string GetCategoryName(BrowseCategory category)
+        public static string GetCategoryName(CatalogSchema schema, string categoryKey)
         {
-            switch (category)
-            {
-                case BrowseCategory.Components: return "Components";
-                case BrowseCategory.Ores: return "Ores";
-                case BrowseCategory.Ingots: return "Ingots";
-                case BrowseCategory.Ammo: return "Ammo";
-                case BrowseCategory.ToolsAndWeapons: return "Tools & Weapons";
-                case BrowseCategory.Consumables: return "Consumables";
-                case BrowseCategory.Items: return "Items";
-                case BrowseCategory.Blocks: return "Blocks";
-                case BrowseCategory.Recipes: return "Recipes";
-                case BrowseCategory.Celestial: return "Celestial";
-                default: return "Entries";
-            }
+            CatalogCategoryDefinition category = schema.GetCategory(categoryKey);
+            return category != null ? category.DisplayName : "Entries";
         }
 
         #endregion

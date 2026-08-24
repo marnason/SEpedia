@@ -5,21 +5,6 @@ using VRageMath;
 
 namespace SEpedia.Core
 {
-    internal enum BrowseCategory
-    {
-        None = 0,
-        Components = 1,
-        Ores = 2,
-        Ingots = 3,
-        Ammo = 4,
-        ToolsAndWeapons = 5,
-        Consumables = 6,
-        Items = 8,
-        Blocks = 9,
-        Recipes = 10,
-        Celestial = 11
-    }
-
     internal sealed class DefinitionOrigin
     {
         #region State
@@ -157,7 +142,7 @@ namespace SEpedia.Core
         public string UiDisplayName { get; private set; }
         public string Description { get; private set; }
         public string RuntimeTypeName { get; private set; }
-        public BrowseCategory BrowseCategory { get; private set; }
+        public string CategoryKey { get; private set; }
         public DefinitionOrigin Origin { get; private set; }
         public bool IsEnabled { get; private set; }
         public bool IsPublic { get; private set; }
@@ -182,7 +167,7 @@ namespace SEpedia.Core
             string authoredDisplayName,
             string description,
             string runtimeTypeName,
-            BrowseCategory browseCategory,
+            string categoryKey,
             DefinitionOrigin origin,
             bool isEnabled,
             bool isPublic,
@@ -198,7 +183,7 @@ namespace SEpedia.Core
             UiDisplayName = GetFirstAuthoredLine(AuthoredDisplayName, id);
             Description = description;
             RuntimeTypeName = runtimeTypeName;
-            BrowseCategory = browseCategory;
+            CategoryKey = categoryKey ?? string.Empty;
             Origin = origin;
             IsEnabled = isEnabled;
             IsPublic = isPublic;

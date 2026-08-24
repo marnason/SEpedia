@@ -117,7 +117,7 @@ namespace SEpedia.UI
                 Visible = false
             };
 
-            definitionView = new DefinitionView(index, celestial);
+            definitionView = new DefinitionView(index, celestial, filter);
             vanillaHud = new VanillaHudVisibilityController();
             closeButton.MouseInput.LeftClicked += delegate { Hide(); };
             previousButton.MouseInput.LeftClicked += delegate { navigation.GoPrevious(); };
@@ -300,13 +300,15 @@ namespace SEpedia.UI
 
         private void FiltersChanged()
         {
-            definitionList.Refresh();
+            definitionList.RefreshWithoutSelectionNotification();
+            navigation.RefreshCurrent();
         }
 
         private void ResetFilters()
         {
             definitionList.Filter.ResetAdvanced(survivalMode);
-            definitionList.Refresh();
+            definitionList.RefreshWithoutSelectionNotification();
+            navigation.RefreshCurrent();
         }
 
         private void RefreshFilterDrawer()

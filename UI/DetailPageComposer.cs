@@ -14,52 +14,86 @@ namespace SEpedia.UI
 
         private readonly DefinitionIndex index;
         private readonly CelestialIndex celestial;
+        private readonly CatalogFilter filter;
+        private readonly CatalogEntryVisibility visibility;
+        private readonly DetailProviderRegistry providers;
 
-        public DetailPageComposer(DefinitionIndex index, CelestialIndex celestial)
+        public DetailPageComposer(DefinitionIndex index, CelestialIndex celestial, CatalogFilter filter)
         {
             this.index = index;
             this.celestial = celestial;
+            this.filter = filter;
+            visibility = filter.EntryVisibility;
+            providers = new DetailProviderRegistry();
+            RegisterProviders();
         }
 
         #endregion
 
         #region Page Composition
 
-        public DetailPageModel Compose(DefinitionDocument definition)
+        private void RegisterProviders()
+        {
+            providers.Register(new DelegateDetailProvider(10,
+                delegate(CatalogEntry entry) { return entry.Definition != null; },
+                delegate(DetailCompositionContext context) { AddDefinitionMetadata(context.Rows, context.Entry.Definition); }));
+            providers.Register(new DelegateDetailProvider(20,
+                delegate(CatalogEntry entry) { return entry.Definition != null && entry.Definition.PhysicalItem != null; },
+                delegate(DetailCompositionContext context)
+                {
+                    DefinitionDocument definition = context.Entry.Definition;
+                    AddHeading(context.Rows, "Physical item");
+                    AddField(context.Rows, "Mass", definition.PhysicalItem.Mass.ToString("0.###"));
+                    AddField(context.Rows, "Volume", definition.PhysicalItem.Volume.ToString("0.######"));
+                }));
+            providers.Register(new DelegateDetailProvider(30,
+                delegate(CatalogEntry entry) { return entry.Definition != null && entry.Definition.Recipe != null; },
+                delegate(DetailCompositionContext context) { AddRecipe(context.Rows, context.Entry.Definition.Recipe); }));
+            providers.Register(new DelegateDetailProvider(40,
+                delegate(CatalogEntry entry) { return entry.Definition != null && entry.Definition.CubeBlock != null; },
+                delegate(DetailCompositionContext context) { AddBlock(context.Rows, context.Entry.Definition.CubeBlock); }));
+            providers.Register(new DelegateDetailProvider(50,
+                delegate(CatalogEntry entry) { return entry.Definition != null && entry.Definition.PlanetGenerator != null; },
+                delegate(DetailCompositionContext context)
+                {
+                    AddPlanetGenerator(context.Rows, context.Entry.Definition.Id, context.Entry.Definition.PlanetGenerator);
+                }));
+            providers.Register(new DelegateDetailProvider(60,
+                delegate(CatalogEntry entry) { return entry.Definition != null && entry.Definition.AsteroidGenerator != null; },
+                delegate(DetailCompositionContext context) { AddAsteroidGenerator(context.Rows, context.Entry.Definition.AsteroidGenerator); }));
+            providers.Register(new DelegateDetailProvider(70,
+                delegate(CatalogEntry entry) { return entry.Definition != null; },
+                delegate(DetailCompositionContext context) { AddReverseRelationships(context.Rows, context.Entry.Definition.Id); }));
+            providers.Register(new DelegateDetailProvider(10,
+                delegate(CatalogEntry entry) { return entry.Planet != null; },
+                delegate(DetailCompositionContext context) { AddSpawnedPlanet(context.Rows, context.Entry.Planet); }));
+        }
+
+        public DetailPageModel Compose(CatalogEntry entry)
         {
             var rows = new List<DetailRowModel>();
+            providers.Compose(entry, rows);
+            if (entry.Definition != null)
+            {
+                DefinitionDocument definition = entry.Definition;
+                return new DetailPageModel(definition.UiDisplayName, definition.Id.ToString(),
+                    definition.RuntimeTypeName, definition.Description, rows);
+            }
+            PlanetSnapshot planet = entry.Planet;
+            return new DetailPageModel(planet.DisplayName, planet.EntityId.ToString(),
+                "Spawned planet", string.Empty, rows);
+        }
+
+        private static void AddDefinitionMetadata(IList<DetailRowModel> rows, DefinitionDocument definition)
+        {
             AddField(rows, "Origin", definition.Origin.DisplayName);
             AddField(rows, "Flags", "Enabled: " + YesNo(definition.IsEnabled)
                 + "   Public: " + YesNo(definition.IsPublic)
                 + "   Survival: " + YesNo(definition.IsAvailableInSurvival));
-
-            if (definition.PhysicalItem != null)
-            {
-                AddHeading(rows, "Physical item");
-                AddField(rows, "Mass", definition.PhysicalItem.Mass.ToString("0.###"));
-                AddField(rows, "Volume", definition.PhysicalItem.Volume.ToString("0.######"));
-            }
-            if (definition.Recipe != null)
-                AddRecipe(rows, definition.Recipe);
-            if (definition.CubeBlock != null)
-                AddBlock(rows, definition.CubeBlock);
-            if (definition.PlanetGenerator != null)
-                AddPlanetGenerator(rows, definition.Id, definition.PlanetGenerator);
-            if (definition.AsteroidGenerator != null)
-                AddAsteroidGenerator(rows, definition.AsteroidGenerator);
-            AddReverseRelationships(rows, definition.Id);
-
-            return new DetailPageModel(
-                definition.UiDisplayName,
-                definition.Id.ToString(),
-                definition.RuntimeTypeName,
-                definition.Description,
-                rows);
         }
 
-        public DetailPageModel Compose(PlanetSnapshot planet)
+        private void AddSpawnedPlanet(IList<DetailRowModel> rows, PlanetSnapshot planet)
         {
-            var rows = new List<DetailRowModel>();
             AddField(rows, "Position", FormatVector(planet.Position));
             AddField(rows, "Minimum radius", FormatDistance(planet.MinimumRadius));
             AddField(rows, "Average radius", FormatDistance(planet.AverageRadius));
@@ -77,20 +111,13 @@ namespace SEpedia.UI
             }
             if (planet.GeneratorId.HasValue)
             {
-                AddPaged(
+                AddRelationships(
                     rows,
                     "Generator",
-                    new List<DetailItem> { CreateDefinitionItem(planet.GeneratorId.Value, string.Empty) },
+                    new List<DetailRelationshipCandidate> { CreateDefinitionCandidate(planet.GeneratorId.Value, string.Empty) },
                     true,
                     false);
             }
-
-            return new DetailPageModel(
-                planet.DisplayName,
-                planet.EntityId.ToString(),
-                "Spawned planet",
-                string.Empty,
-                rows);
         }
 
         #endregion
@@ -102,10 +129,10 @@ namespace SEpedia.UI
             AddHeading(rows, "Recipe");
             AddField(rows, "Base time", recipe.BaseProductionTimeSeconds.ToString("0.###") + " s");
             AddField(rows, "Atomic", YesNo(recipe.IsAtomic));
-            AddPaged(rows, "Inputs", CreateAmountItems(recipe.Prerequisites), false, true);
-            AddPaged(rows, "Outputs", CreateAmountItems(recipe.Results), false, true);
+            AddRelationships(rows, "Inputs", CreateAmountItems(recipe.Prerequisites), false, true);
+            AddRelationships(rows, "Outputs", CreateAmountItems(recipe.Results), false, true);
             if (recipe.ProductionBlocks.Count > 0)
-                AddPaged(rows, "Available in production blocks", CreateProductionBlockItems(recipe.ProductionBlocks), false, false);
+                AddRelationships(rows, "Available in production blocks", CreateProductionBlockItems(recipe.ProductionBlocks), false, false);
         }
 
         private void AddBlock(IList<DetailRowModel> rows, CubeBlockData block)
@@ -118,15 +145,15 @@ namespace SEpedia.UI
             if (!string.IsNullOrWhiteSpace(block.BlockPairName))
                 AddField(rows, "Block pair", block.BlockPairName);
             if (block.RelatedBlocks.Count > 0)
-                AddPaged(rows, "Variants and paired sizes", CreateDefinitionItems(block.RelatedBlocks), false, false);
+                AddRelationships(rows, "Variants and paired sizes", CreateDefinitionItems(block.RelatedBlocks), false, false);
 
-            var components = new List<DetailItem>();
+            var components = new List<DetailRelationshipCandidate>();
             for (int index = 0; index < block.Components.Count; index++)
             {
                 BlockComponentRequirement requirement = block.Components[index];
-                components.Add(CreateDefinitionItem(requirement.ComponentId, requirement.Count + " × "));
+                components.Add(CreateDefinitionCandidate(requirement.ComponentId, requirement.Count + " × "));
             }
-            AddPaged(rows, "Components", components, false, true);
+            AddRelationships(rows, "Components", components, false, true);
         }
 
         private void AddPlanetGenerator(
@@ -149,7 +176,7 @@ namespace SEpedia.UI
             if (!string.IsNullOrWhiteSpace(planet.PersistentWeather))
                 AddField(rows, "Persistent weather", planet.PersistentWeather);
 
-            AddPaged(
+            AddRelationships(
                 rows,
                 "Spawned planets",
                 CreateSpawnedPlanetItems(generatorId),
@@ -161,10 +188,10 @@ namespace SEpedia.UI
                 weather.Add(new DetailItem(planet.WeatherTypes[index]));
             AddPaged(rows, "Weather types", weather, false, false);
 
-            var ores = new List<DetailItem>();
+            var ores = new List<DetailRelationshipCandidate>();
             for (int index = 0; index < planet.Ores.Count; index++)
                 ores.Add(CreatePlanetOreItem(planet.Ores[index]));
-            AddPaged(rows, "Ore mappings", ores, false, false);
+            AddRelationships(rows, "Ore mappings", ores, false, false);
         }
 
         private static void AddAsteroidGenerator(IList<DetailRowModel> rows, AsteroidGeneratorData asteroid)
@@ -188,9 +215,9 @@ namespace SEpedia.UI
 
         #region Relationship Items
 
-        private List<DetailItem> CreateSpawnedPlanetItems(MyDefinitionId generatorId)
+        private List<DetailRelationshipCandidate> CreateSpawnedPlanetItems(MyDefinitionId generatorId)
         {
-            var items = new List<DetailItem>();
+            var items = new List<DetailRelationshipCandidate>();
             if (celestial == null)
                 return items;
 
@@ -202,7 +229,7 @@ namespace SEpedia.UI
                     continue;
 
                 var entry = new CatalogEntry(planet);
-                items.Add(new DetailItem(entry.DisplayName, entry));
+                items.Add(new DetailRelationshipCandidate(entry.DisplayName, entry));
             }
             return items;
         }
@@ -210,7 +237,7 @@ namespace SEpedia.UI
         private void AddReverseRelationships(IList<DetailRowModel> rows, MyDefinitionId definitionId)
         {
             IReadOnlyList<PlanetOreUsage> planetUsages = index.GetPlanetGeneratorsUsingOre(definitionId);
-            var planetItems = new List<DetailItem>();
+            var planetItems = new List<DetailRelationshipCandidate>();
             int planetUsageIndex = 0;
             while (planetUsageIndex < planetUsages.Count)
             {
@@ -222,7 +249,13 @@ namespace SEpedia.UI
 
                 DefinitionDocument generator;
                 if (!index.TryGet(generatorId, out generator))
+                {
+                    int unavailableMappingCount = planetUsageIndex - firstUsageIndex;
+                    planetItems.Add(new DetailRelationshipCandidate(
+                        generatorId + " (definition unavailable) – " +
+                        unavailableMappingCount + (unavailableMappingCount == 1 ? " mapping" : " mappings")));
                     continue;
+                }
 
                 int mappingCount = planetUsageIndex - firstUsageIndex;
                 string text = generator.UiDisplayName + " – " +
@@ -232,36 +265,36 @@ namespace SEpedia.UI
                 var toolTip = new StringBuilder("Ore mappings in " + generator.UiDisplayName);
                 for (int mappingIndex = firstUsageIndex; mappingIndex < planetUsageIndex; mappingIndex++)
                     toolTip.Append('\n').Append(FormatPlanetOreMapping(planetUsages[mappingIndex].Mapping));
-                planetItems.Add(new DetailItem(text, new CatalogEntry(generator), toolTip.ToString()));
+                planetItems.Add(new DetailRelationshipCandidate(text, new CatalogEntry(generator), toolTip.ToString()));
             }
-            AddPaged(rows, "Planet generators", planetItems, true, false);
+            AddRelationships(rows, "Planet generators", planetItems, true, false);
 
             IReadOnlyList<RecipeDocument> producing = index.Recipes.GetMenuProducingRecipes(definitionId);
             if (producing.Count > 0)
-                AddPaged(rows, "Produced by recipes", CreateRecipeItems(producing, definitionId, false), true, false);
+                AddRelationships(rows, "Produced by recipes", CreateRecipeItems(producing, definitionId, false), true, false);
             IReadOnlyList<RecipeDocument> consuming = index.Recipes.GetMenuConsumingRecipes(definitionId);
             if (consuming.Count > 0)
-                AddPaged(rows, "Used in recipes", CreateRecipeItems(consuming, definitionId, true), true, false);
+                AddRelationships(rows, "Used in recipes", CreateRecipeItems(consuming, definitionId, true), true, false);
 
             IReadOnlyList<BlockUsage> usages = index.GetBlocksUsing(definitionId);
-            var items = new List<DetailItem>();
+            var items = new List<DetailRelationshipCandidate>();
             for (int usageIndex = 0; usageIndex < usages.Count; usageIndex++)
-                items.Add(CreateDefinitionItem(usages[usageIndex].BlockId, usages[usageIndex].Count + " × "));
-            AddPaged(rows, "Used in blocks", items, true, false);
+                items.Add(CreateDefinitionCandidate(usages[usageIndex].BlockId, usages[usageIndex].Count + " × "));
+            AddRelationships(rows, "Used in blocks", items, true, false);
         }
 
-        private List<DetailItem> CreateRecipeItems(
+        private List<DetailRelationshipCandidate> CreateRecipeItems(
             IReadOnlyList<RecipeDocument> recipes,
             MyDefinitionId itemId,
             bool consumed)
         {
-            var items = new List<DetailItem>();
+            var items = new List<DetailRelationshipCandidate>();
             for (int index = 0; index < recipes.Count; index++)
             {
                 RecipeDocument recipe = recipes[index];
                 MyFixedPoint amount = GetAmount(consumed ? recipe.Prerequisites : recipe.Results, itemId);
                 CatalogEntry link = CreateDefinitionLink(recipe.DefinitionId);
-                items.Add(new DetailItem(
+                items.Add(new DetailRelationshipCandidate(
                     GetDefinitionName(recipe.DefinitionId) + " – " + FormatAmount(amount, itemId).TrimEnd(),
                     link,
                     BuildRecipeToolTip(recipe)));
@@ -299,48 +332,48 @@ namespace SEpedia.UI
             }
         }
 
-        private List<DetailItem> CreateAmountItems(IReadOnlyList<DefinitionAmount> amounts)
+        private List<DetailRelationshipCandidate> CreateAmountItems(IReadOnlyList<DefinitionAmount> amounts)
         {
-            var items = new List<DetailItem>();
+            var items = new List<DetailRelationshipCandidate>();
             for (int index = 0; index < amounts.Count; index++)
             {
                 DefinitionAmount amount = amounts[index];
-                items.Add(CreateDefinitionItem(amount.DefinitionId, FormatAmount(amount.Amount, amount.DefinitionId)));
+                items.Add(CreateDefinitionCandidate(amount.DefinitionId, FormatAmount(amount.Amount, amount.DefinitionId)));
             }
             return items;
         }
 
-        private List<DetailItem> CreateDefinitionItems(IReadOnlyList<MyDefinitionId> ids)
+        private List<DetailRelationshipCandidate> CreateDefinitionItems(IReadOnlyList<MyDefinitionId> ids)
         {
-            var items = new List<DetailItem>();
+            var items = new List<DetailRelationshipCandidate>();
             for (int index = 0; index < ids.Count; index++)
-                items.Add(CreateDefinitionItem(ids[index], string.Empty));
+                items.Add(CreateDefinitionCandidate(ids[index], string.Empty));
             return items;
         }
 
-        private List<DetailItem> CreateProductionBlockItems(IReadOnlyList<MyDefinitionId> ids)
+        private List<DetailRelationshipCandidate> CreateProductionBlockItems(IReadOnlyList<MyDefinitionId> ids)
         {
-            var items = new List<DetailItem>();
+            var items = new List<DetailRelationshipCandidate>();
             for (int index = 0; index < ids.Count; index++)
             {
                 DefinitionDocument block;
                 if (!this.index.TryGet(ids[index], out block))
                 {
-                    items.Add(new DetailItem(ids[index] + " (definition unavailable)"));
+                    items.Add(new DetailRelationshipCandidate(ids[index] + " (definition unavailable)"));
                     continue;
                 }
                 string grid = block.CubeBlock != null ? " – " + block.CubeBlock.CubeSize + " grid" : string.Empty;
-                items.Add(new DetailItem(block.UiDisplayName + grid, new CatalogEntry(block)));
+                items.Add(new DetailRelationshipCandidate(block.UiDisplayName + grid, new CatalogEntry(block)));
             }
             return items;
         }
 
-        private DetailItem CreateDefinitionItem(MyDefinitionId definitionId, string prefix)
+        private DetailRelationshipCandidate CreateDefinitionCandidate(MyDefinitionId definitionId, string prefix)
         {
             DefinitionDocument target;
             if (!index.TryGet(definitionId, out target))
-                return new DetailItem(prefix + definitionId + " (definition unavailable)");
-            return new DetailItem(prefix + target.UiDisplayName, new CatalogEntry(target));
+                return new DetailRelationshipCandidate(prefix + definitionId + " (definition unavailable)");
+            return new DetailRelationshipCandidate(prefix + target.UiDisplayName, new CatalogEntry(target));
         }
 
         private CatalogEntry CreateDefinitionLink(MyDefinitionId definitionId)
@@ -351,17 +384,17 @@ namespace SEpedia.UI
                 : null;
         }
 
-        private DetailItem CreatePlanetOreItem(PlanetOreData mapping)
+        private DetailRelationshipCandidate CreatePlanetOreItem(PlanetOreData mapping)
         {
             string details = FormatPlanetOreMapping(mapping);
             if (!mapping.OreId.HasValue)
-                return new DetailItem(details + " (ore unavailable)");
+                return new DetailRelationshipCandidate(details + " (ore unavailable)");
 
             DefinitionDocument ore;
             if (!index.TryGet(mapping.OreId.Value, out ore))
-                return new DetailItem(details + " (ore unavailable)");
+                return new DetailRelationshipCandidate(details + " (ore unavailable)");
 
-            return new DetailItem(
+            return new DetailRelationshipCandidate(
                 mapping.Material + " → " + ore.UiDisplayName + " – " + FormatPlanetOreDepth(mapping),
                 new CatalogEntry(ore));
         }
@@ -389,7 +422,7 @@ namespace SEpedia.UI
         {
             DefinitionDocument item;
             if (index.TryGet(itemId, out item) &&
-                (item.BrowseCategory == BrowseCategory.Ores || item.BrowseCategory == BrowseCategory.Ingots))
+                (item.CategoryKey == CatalogCategoryKeys.Ores || item.CategoryKey == CatalogCategoryKeys.Ingots))
                 return amount + " m³ ";
             return amount + " × ";
         }
@@ -408,6 +441,36 @@ namespace SEpedia.UI
         #endregion
 
         #region Row Factories
+
+        private void AddRelationships(
+            IList<DetailRowModel> rows,
+            string heading,
+            IList<DetailRelationshipCandidate> candidates,
+            bool major,
+            bool showEmpty)
+        {
+            var items = new List<DetailItem>();
+            int hiddenCount = 0;
+            for (int index = 0; index < candidates.Count; index++)
+            {
+                DetailRelationshipCandidate candidate = candidates[index];
+                if (candidate.Target != null &&
+                    !visibility.IsCommonlyVisible(candidate.Target, filter.Visibility))
+                {
+                    hiddenCount++;
+                    continue;
+                }
+                items.Add(new DetailItem(candidate.Text, candidate.Target, candidate.ToolTip));
+            }
+
+            if (items.Count == 0 && hiddenCount == 0)
+            {
+                if (!showEmpty)
+                    return;
+                items.Add(new DetailItem("None"));
+            }
+            rows.Add(DetailRowModel.Paged(heading, items, major, hiddenCount));
+        }
 
         private static void AddHeading(IList<DetailRowModel> rows, string text)
         {
@@ -443,7 +506,7 @@ namespace SEpedia.UI
                     return;
                 items.Add(new DetailItem("None"));
             }
-            rows.Add(DetailRowModel.Paged(heading, items, major));
+            rows.Add(DetailRowModel.Paged(heading, items, major, 0));
         }
 
         #endregion
