@@ -216,7 +216,7 @@ Click-GamePosition 1200 450
 Start-Sleep -Milliseconds 400
 Click-GamePosition 800 1120
 Start-Sleep -Milliseconds 400
-Move-GameCursor 2240 1200
+Move-GameCursor 2800 1080
 Start-Sleep -Milliseconds 400
 Save-GameScreenshot '01-ingots.png'
 
