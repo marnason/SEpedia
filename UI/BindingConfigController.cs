@@ -52,6 +52,7 @@ namespace SEpedia.UI
                 Enabled = true
             };
             rebindPage.Add(bindGroup, defaults.GetBindDefinitions());
+            RichHudTerminal.Root.Enabled = true;
             RichHudTerminal.Root.AddRange(new IModRootMember[] { rebindPage });
 
             savedSignature = GetSignature(bindGroup.GetBindDefinitions());
