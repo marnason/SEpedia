@@ -222,7 +222,7 @@ Save-GameScreenshot '01-ingots.png'
 
 
 Start-Sleep -Milliseconds 400
-Click-GamePosition 2240 1200
+Click-GamePosition 2800 1080
 Start-Sleep -Milliseconds 400
 Move-GameCursor 3300 1900
 Start-Sleep -Milliseconds 400
