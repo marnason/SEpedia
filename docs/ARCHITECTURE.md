@@ -18,7 +18,7 @@ Failures at game or mod-data boundaries are isolated and summarized by `Definiti
 
 ## Detail and layout flow
 
-`DetailPageComposer` orchestrates ordered providers over strongly typed definition and celestial data. Providers emit relationship candidates, and the central relationship builder applies common visibility before producing bounded detail rows. Filtered candidates contribute exact hidden counts while unresolved non-link metadata remains visible. `DefinitionView` renders that model and recomposes the current history entry when common visibility changes. Dynamic detail and facet collections reuse eight live slots plus a shared pager.
+`DetailPageComposer` orchestrates ordered providers over strongly typed definition and celestial data. Providers emit relationship candidates, and the central relationship builder applies common visibility before producing bounded detail rows. Filtered candidates contribute exact hidden counts while unresolved non-link metadata remains visible. `DefinitionView` renders that model and recomposes the current history entry when common visibility changes. Consecutive relationship sections flow through a responsive fixed-cell grid, so incomplete rows retain the same column width as complete rows. Detail scrolling uses a fixed pixel wheel step and retains its offset across transient Rich HUD layout-range changes.
 
 Nested `HudChain` containers own row-and-column placement. Dynamic controls remain bounded because Rich HUD traverses retained nodes every frame.
 

@@ -41,7 +41,8 @@ namespace SEpedia.UI
                     hiddenItemCount > 0
                         ? headingText + " (" + hiddenItemCount + " hidden by filters)"
                         : headingText,
-                    majorHeading ? GlyphFormat.Blueish.WithSize(1.02f) : GlyphFormat.White.WithSize(.92f)),
+                    (majorHeading ? GlyphFormat.Blueish.WithSize(1.02f) : GlyphFormat.White.WithSize(.92f))
+                        .WithAlignment(TextAlignment.Center)),
                 Height = majorHeading ? 31f : 25f,
                 AutoResize = false,
                 VertCenterText = true,
@@ -51,8 +52,11 @@ namespace SEpedia.UI
             Root = new HudChain(true)
             {
                 SizingMode = HudChainSizingModes.FitChainAlignAxis | HudChainSizingModes.FitMembersOffAxis,
+                ParentAlignment = ParentAlignments.InnerTop,
+                Padding = new Vector2(6f, 6f),
                 Spacing = 1f
             };
+            UiTheme.AddGroupPanelBackdrop(Root);
             Root.Add(heading);
 
             slots = new LabelButton[UiTheme.DetailSectionPageSize];
@@ -85,12 +89,13 @@ namespace SEpedia.UI
         public void SetWidth(float width)
         {
             Root.Width = width;
-            heading.Width = width;
-            pager.Root.Width = width;
+            float contentWidth = Math.Max(60f, width - Root.Padding.X);
+            heading.Width = contentWidth;
+            pager.Root.Width = contentWidth;
             for (int index = 0; index < slots.Length; index++)
             {
-                slots[index].Width = width;
-                slots[index].LineWrapWidth = Math.Max(60f, width - slots[index].Padding.X);
+                slots[index].Width = contentWidth;
+                slots[index].LineWrapWidth = Math.Max(60f, contentWidth - slots[index].Padding.X);
             }
         }
 

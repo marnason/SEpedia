@@ -13,9 +13,9 @@ namespace SEpedia.UI
 
         public event Action<CatalogEntry> LinkClicked;
 
-        private readonly ScrollBox content;
+        private readonly DetailScrollBox content;
         private readonly List<HudElementBase> rows;
-        private readonly List<PagedDetailSection> pagedSections;
+        private readonly List<DetailSectionGrid> sectionGrids;
         private readonly DefinitionHeader header;
         private readonly DetailPageComposer composer;
         private float lastRowWidth;
@@ -29,11 +29,11 @@ namespace SEpedia.UI
         {
             composer = new DetailPageComposer(index, celestial, filter);
             rows = new List<HudElementBase>();
-            pagedSections = new List<PagedDetailSection>();
+            sectionGrids = new List<DetailSectionGrid>();
             lastRowWidth = -1f;
             layoutDirty = true;
 
-            content = new ScrollBox(this)
+            content = new DetailScrollBox(this)
             {
                 DimAlignment = DimAlignments.UnpaddedSize,
                 SizingMode = HudChainSizingModes.FitMembersOffAxis,
@@ -78,10 +78,20 @@ namespace SEpedia.UI
 
         protected override void Layout()
         {
-            float rowWidth = Math.Max(120f, UnpaddedSize.X - content.ScrollBar.Width - content.Padding.X - 12f);
+            float rowWidth = GetAvailableRowWidth();
             if (!layoutDirty && Math.Abs(rowWidth - lastRowWidth) < .01f)
                 return;
 
+            ApplyRowWidth(rowWidth);
+        }
+
+        private float GetAvailableRowWidth()
+        {
+            return Math.Max(120f, content.UnpaddedSize.X - content.ScrollBar.Width);
+        }
+
+        private void ApplyRowWidth(float rowWidth)
+        {
             for (int index = 0; index < rows.Count; index++)
             {
                 rows[index].Width = rowWidth;
@@ -90,8 +100,8 @@ namespace SEpedia.UI
                     label.LineWrapWidth = Math.Max(80f, rowWidth - label.Padding.X);
             }
             header.SetWidth(rowWidth);
-            for (int index = 0; index < pagedSections.Count; index++)
-                pagedSections[index].SetWidth(rowWidth);
+            for (int index = 0; index < sectionGrids.Count; index++)
+                sectionGrids[index].SetWidth(rowWidth);
 
             lastRowWidth = rowWidth;
             layoutDirty = false;
@@ -107,30 +117,42 @@ namespace SEpedia.UI
             header.Update(page.Title, page.Id, page.RuntimeType, page.Description);
             AddRow(header.Root);
 
+            DetailSectionGrid grid = null;
             for (int index = 0; index < page.Rows.Count; index++)
             {
                 DetailRowModel row = page.Rows[index];
                 switch (row.Kind)
                 {
                     case DetailRowKind.Heading:
+                        grid = null;
                         AddSection(row.Label);
                         break;
                     case DetailRowKind.Field:
+                        grid = null;
                         AddKeyValue(row.Label, row.Value);
                         break;
                     case DetailRowKind.PagedSection:
-                        AddPagedSection(row.Label, row.Items, row.Major, row.HiddenItemCount);
+                        if (grid == null)
+                        {
+                            grid = new DetailSectionGrid();
+                            sectionGrids.Add(grid);
+                            AddRow(grid.Root);
+                        }
+                        grid.Add(new PagedDetailSection(
+                            RaiseLinkClicked,
+                            row.Label,
+                            row.Items,
+                            row.Major,
+                            row.HiddenItemCount));
                         break;
                 }
             }
-            ScrollToTop();
-        }
 
-        private void AddPagedSection(string heading, IReadOnlyList<DetailItem> items, bool major, int hiddenItemCount)
-        {
-            var section = new PagedDetailSection(RaiseLinkClicked, heading, items, major, hiddenItemCount);
-            pagedSections.Add(section);
-            AddRow(section.Root);
+            float renderWidth = lastRowWidth > 0f
+                ? lastRowWidth
+                : GetAvailableRowWidth();
+            ApplyRowWidth(renderWidth);
+            ScrollToTop();
         }
 
         #endregion
@@ -187,14 +209,13 @@ namespace SEpedia.UI
         {
             content.Clear();
             rows.Clear();
-            pagedSections.Clear();
+            sectionGrids.Clear();
             layoutDirty = true;
         }
 
         private void ScrollToTop()
         {
-            content.ScrollBar.Value = 0f;
-            content.Start = 0;
+            content.ResetScroll();
         }
 
         #endregion

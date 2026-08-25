@@ -226,7 +226,7 @@ namespace SEpedia.UI
             base.Layout();
             SetWidthIfChanged(searchField, Math.Min(360f, Math.Max(220f, Width * .32f)));
             SetWidthIfChanged(definitionList, Math.Min(280f, Math.Max(220f, body.Width * .224f)));
-            SetWidthIfChanged(filterDrawer, Math.Min(320f, Math.Max(250f, body.Width * .25f)));
+            SetWidthIfChanged(filterDrawer, Math.Min(320f, Math.Max(UiTheme.AdvancedFilterMinimumWidth, body.Width * .25f)));
             definitionList.UpdateCategoryLayout(body.Width);
         }
 

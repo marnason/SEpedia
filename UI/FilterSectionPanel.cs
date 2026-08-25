@@ -21,19 +21,7 @@ namespace SEpedia.UI
                 Spacing = 2f
             };
 
-            new TexturedBox(Root)
-            {
-                DimAlignment = DimAlignments.Size,
-                Color = UiTheme.FilterSection,
-                ZOffset = -2
-            };
-            new BorderBox(Root)
-            {
-                DimAlignment = DimAlignments.Size,
-                Color = UiTheme.FilterSectionBorder,
-                Thickness = 1f,
-                ZOffset = -1
-            };
+            UiTheme.AddGroupPanelBackdrop(Root);
 
             Entry = new ScrollBoxEntry();
             Entry.SetElement(Root);
