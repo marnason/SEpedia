@@ -8,7 +8,7 @@ on:
         required: false
         type: string
       changelog:
-        description: Changelog published to both Steam Workshop and GitHub
+        description: Changelog published to both Steam Workshop and GitHub. Use \n for line breaks.
         default: '・'
         required: true
         type: string
@@ -97,7 +97,7 @@ jobs:
           python3 - <<'PY'
           import os
 
-          changelog = os.environ["CHANGELOG"]
+          changelog = os.environ["CHANGELOG"].replace("\\n", "\n")
           if "\0" in changelog:
               raise SystemExit("Changelog must not contain NUL characters.")
           if not changelog.strip():
@@ -270,7 +270,7 @@ jobs:
           preview_file = (content_folder / "thumb.png").resolve(strict=True)
           published_file_id = os.environ["PUBLISHED_FILE_ID"]
           release_tag = os.environ["RELEASE_TAG"]
-          changelog = os.environ["CHANGELOG"]
+          changelog = os.environ["CHANGELOG"].replace("\\n", "\n")
 
           if published_file_id != "3784965557":
               raise SystemExit("Refusing to upload to an unexpected Workshop item.")
@@ -421,6 +421,7 @@ jobs:
           WORKSHOP_URL: ${{ vars.STEAM_WORKSHOP_URL }}
         shell: bash
         run: |
+          CHANGELOG=${CHANGELOG//\\n/$'\n'}
           cd -- "$RUNNER_TEMP/release"
           sha256sum --check "$RELEASE_ARCHIVE.sha256"
 
