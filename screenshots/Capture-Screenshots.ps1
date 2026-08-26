@@ -143,7 +143,7 @@ function Click-GamePosition {
     [NativeMouseInputMethods]::SendMouseButton(0x0002)
     Start-Sleep -Milliseconds 50
     [NativeMouseInputMethods]::SendMouseButton(0x0004)
-    Start-Sleep -Milliseconds 200
+    Start-Sleep -Milliseconds 500
 }
 
 function Move-GameCursor {
@@ -163,7 +163,7 @@ function Move-GameCursor {
         throw 'Could not move the mouse pointer to the requested position.'
     }
 
-    Start-Sleep -Milliseconds 200
+    Start-Sleep -Milliseconds 500
 }
 
 function Save-GameScreenshot {
@@ -209,21 +209,16 @@ function Save-GameScreenshot {
     }
 
     Get-Item -LiteralPath $outputPath
+    Start-Sleep -Milliseconds 500
 }
 
-Start-Sleep -Milliseconds 2000
+Start-Sleep -Milliseconds 3000
+
 Click-GamePosition 1200 450
-Start-Sleep -Milliseconds 400
 Click-GamePosition 800 1120
-Start-Sleep -Milliseconds 400
 Move-GameCursor 2800 1080
-Start-Sleep -Milliseconds 400
 Save-GameScreenshot '01-ingots.png'
 
-
-Start-Sleep -Milliseconds 400
 Click-GamePosition 2800 1080
-Start-Sleep -Milliseconds 400
 Move-GameCursor 3300 1900
-Start-Sleep -Milliseconds 400
 Save-GameScreenshot '02-rocket.png'

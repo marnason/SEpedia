@@ -59,6 +59,14 @@ namespace SEpedia.UI
             publicFilter = AddTriState(definitionSection, "Public", delegate(TriStateFilter value) { filter.Visibility.PublicState = value; });
             survivalFilter = AddTriState(definitionSection, "Survival", delegate(TriStateFilter value) { filter.Visibility.SurvivalState = value; });
 
+            sources = new PagedFacetSection(
+                content,
+                "Source",
+                "All sources",
+                filter.Visibility.SelectedSourceKeys,
+                false,
+                RaiseChanged);
+
             var availabilitySection = new FilterSectionPanel(content, blockOnlyEntries);
             availabilitySection.Add(CreateHeading("Block availability"));
             buildMenuFilter = AddTriState(availabilitySection, "Listed in G menu", delegate(TriStateFilter value) { filter.BuildMenuState = value; });
@@ -89,13 +97,6 @@ namespace SEpedia.UI
                 }
             }
 
-            sources = new PagedFacetSection(
-                content,
-                "Source",
-                "All sources",
-                filter.Visibility.SelectedSourceKeys,
-                false,
-                RaiseChanged);
         }
 
         #endregion

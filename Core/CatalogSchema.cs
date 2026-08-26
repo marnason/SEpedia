@@ -11,9 +11,7 @@ namespace SEpedia.Core
         public const string Ores = "ores";
         public const string Ingots = "ingots";
         public const string Ammo = "ammo";
-        public const string ToolsAndWeapons = "tools-weapons";
-        public const string Consumables = "consumables";
-        public const string Items = "items";
+        public const string ToolsGearAndSupplies = "tools-gear-supplies";
         public const string Blocks = "blocks";
         public const string Recipes = "recipes";
         public const string Celestial = "celestial";
@@ -147,9 +145,7 @@ namespace SEpedia.Core
                 new CatalogCategoryDefinition(CatalogCategoryKeys.Ores, "Ores", 20),
                 new CatalogCategoryDefinition(CatalogCategoryKeys.Ingots, "Ingots", 30),
                 new CatalogCategoryDefinition(CatalogCategoryKeys.Ammo, "Ammo", 40),
-                new CatalogCategoryDefinition(CatalogCategoryKeys.ToolsAndWeapons, "Tools & Weapons", 50),
-                new CatalogCategoryDefinition(CatalogCategoryKeys.Consumables, "Consumables", 60),
-                new CatalogCategoryDefinition(CatalogCategoryKeys.Items, "Items", 70),
+                new CatalogCategoryDefinition(CatalogCategoryKeys.ToolsGearAndSupplies, "Tools, Gear & Supplies", 50),
                 new CatalogCategoryDefinition(CatalogCategoryKeys.Blocks, "Blocks", 80, blockType),
                 new CatalogCategoryDefinition(CatalogCategoryKeys.Recipes, "Recipes", 90),
                 new CatalogCategoryDefinition(CatalogCategoryKeys.Celestial, "Celestial", 100, celestialKind)

@@ -124,6 +124,9 @@ namespace SEpedia.Core
 
         private string GetDisplayName(MyDefinitionBase definition, MyDefinitionId id)
         {
+            if (HasMisleadingTreeObjectName(definition, id))
+                return !string.IsNullOrWhiteSpace(id.SubtypeName) ? id.SubtypeName : id.ToString();
+
             try
             {
                 string displayName = definition.DisplayNameText;
@@ -152,6 +155,16 @@ namespace SEpedia.Core
                 return "Asteroid generator " + id.SubtypeName;
 
             return !string.IsNullOrWhiteSpace(id.SubtypeName) ? id.SubtypeName : id.ToString();
+        }
+
+        private static bool HasMisleadingTreeObjectName(MyDefinitionBase definition, MyDefinitionId id)
+        {
+            return IsTreeObject(id) &&
+                definition.DisplayNameEnum.HasValue &&
+                string.Equals(
+                    definition.DisplayNameEnum.Value.ToString(),
+                    "DisplayName_Item_Welder",
+                    StringComparison.Ordinal);
         }
 
         private static bool IsBareAsteroidGeneratorName(
@@ -192,15 +205,17 @@ namespace SEpedia.Core
 
         private static string GetPhysicalCategoryKey(MyPhysicalItemDefinition definition)
         {
+            if (IsTreeObject(definition.Id)) return string.Empty;
             if (definition is MyComponentDefinition) return CatalogCategoryKeys.Components;
             if (definition.IsOre) return CatalogCategoryKeys.Ores;
             if (definition.IsIngot) return CatalogCategoryKeys.Ingots;
             if (definition is MyAmmoMagazineDefinition) return CatalogCategoryKeys.Ammo;
-            if (definition is MyOxygenContainerDefinition) return CatalogCategoryKeys.ToolsAndWeapons;
-            if (definition is MyConsumableItemDefinition) return CatalogCategoryKeys.Consumables;
-            if (definition is MyToolItemDefinition || definition is MyWeaponItemDefinition)
-                return CatalogCategoryKeys.ToolsAndWeapons;
-            return CatalogCategoryKeys.Items;
+            return CatalogCategoryKeys.ToolsGearAndSupplies;
+        }
+
+        private static bool IsTreeObject(MyDefinitionId id)
+        {
+            return id.TypeId == typeof(MyObjectBuilder_TreeObject);
         }
 
         #endregion

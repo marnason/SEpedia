@@ -30,6 +30,8 @@ namespace SEpedia.UI
             }
         }
 
+        private const float MinimumButtonWidth = 62f;
+        private const float ButtonHorizontalPadding = 12f;
         private const float RowSpacing = 2f;
         private readonly CatalogFilter filter;
         private readonly Action categoryChanged;
@@ -70,10 +72,12 @@ namespace SEpedia.UI
 
         public void UpdateLayout(float availableWidth)
         {
-            this.availableWidth = Math.Max(1f, availableWidth);
+            float normalizedWidth = Math.Max(1f, availableWidth);
+            bool widthChanged = Math.Abs(this.availableWidth - normalizedWidth) > .01f;
+            this.availableWidth = normalizedWidth;
             List<CategoryButton> availableButtons = GetAvailableButtons();
             int rowCount = GetRowCount(availableButtons, this.availableWidth);
-            if (rowCount != activeRows)
+            if (rowCount != activeRows || widthChanged)
                 Reflow(availableButtons, rowCount);
         }
 
@@ -163,7 +167,7 @@ namespace SEpedia.UI
                 Height = 29f,
                 AutoResize = false,
                 VertCenterText = true,
-                TextPadding = new Vector2(4f, 0f),
+                TextPadding = new Vector2(ButtonHorizontalPadding * 2f, 0f),
                 Color = UiTheme.Panel,
                 HighlightColor = UiTheme.PanelHighlight
             };
@@ -176,7 +180,11 @@ namespace SEpedia.UI
                 if (categoryChanged != null)
                     categoryChanged();
             };
-            buttons.Add(new CategoryButton(category, button, Math.Max(62f, name.Length * 8f + 24f)));
+            float minimumWidth = Math.Max(
+                MinimumButtonWidth,
+                button.TextBoard.TextSize.X + ButtonHorizontalPadding * 2f);
+            button.Width = minimumWidth;
+            buttons.Add(new CategoryButton(category, button, minimumWidth));
         }
 
         #endregion
@@ -200,10 +208,11 @@ namespace SEpedia.UI
             for (int row = 0; row < rowCount; row++)
             {
                 int end = rowEnds[row];
+                SetRowButtonWidths(availableButtons, start, end);
                 for (int index = start; index < end; index++)
                 {
                     CategoryButton button = availableButtons[index];
-                    rows[row].Add(button.Button, button.MinimumWidth);
+                    rows[row].Add(button.Button, 0f);
                 }
                 start = end;
             }
@@ -225,6 +234,27 @@ namespace SEpedia.UI
                 };
                 rows.Add(row);
                 Root.Add(row);
+            }
+        }
+
+        private void SetRowButtonWidths(
+            IReadOnlyList<CategoryButton> availableButtons,
+            int start,
+            int end)
+        {
+            int buttonCount = end - start;
+            if (buttonCount <= 0)
+                return;
+
+            float minimumRowWidth = Math.Max(0, buttonCount - 1) * RowSpacing;
+            for (int index = start; index < end; index++)
+                minimumRowWidth += availableButtons[index].MinimumWidth;
+
+            float extraWidthPerButton = Math.Max(0f, availableWidth - minimumRowWidth) / buttonCount;
+            for (int index = start; index < end; index++)
+            {
+                CategoryButton button = availableButtons[index];
+                button.Button.Width = button.MinimumWidth + extraWidthPerButton;
             }
         }
 
